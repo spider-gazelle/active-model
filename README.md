@@ -1,4 +1,4 @@
-# Hyperloop ActiveModel
+# Spider-Gazelle ActiveModel
 
 Active Model provides a known set of interfaces for usage in model classes. Active Model also helps with building custom ORMs.
 
