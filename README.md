@@ -1,5 +1,7 @@
 # Spider-Gazelle ActiveModel
 
+[![Build Status](https://travis-ci.org/spider-gazelle/active-model.svg?branch=master)](https://travis-ci.org/spider-gazelle/active-model)
+
 Active Model provides a known set of interfaces for usage in model classes. Active Model also helps with building custom ORMs.
 
 
