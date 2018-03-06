@@ -209,8 +209,9 @@ describe ActiveModel::Model do
   describe "attribute options" do
     it "should convert values using converters" do
       AttributeOptions.attributes.should eq [:time, :bob]
-      opts = AttributeOptions.from_json(%({"time": 1459859781}))
+      opts = AttributeOptions.from_json(%({"time": 1459859781, "bob": "Angus"}))
       opts.time.should eq Time.epoch(1459859781)
+      opts.to_json.should eq %({"time":1459859781,"bob":"Bobby"})
     end
 
     it "should not assign attributes protected from mass assignment" do

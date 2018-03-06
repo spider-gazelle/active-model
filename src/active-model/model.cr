@@ -165,24 +165,21 @@ abstract class ActiveModel::Model
     {% if HAS_KEYS[0] %}
       JSON.mapping(
         {% for name, opts in FIELDS %}
-          {% if opts[:mass_assign] %}
-            {% if opts[:converter] %}
-              {{name}}: { type: {{opts[:klass]}} | Nil, converter: {{opts[:converter]}} },
-            {% else %}
-              {{name}}: {{opts[:klass]}} | Nil,
-            {% end %}
+          {% if opts[:converter] %}
+            {{name}}: { type: {{opts[:klass]}} | Nil, converter: {{opts[:converter]}} },
+          {% else %}
+            {{name}}: {{opts[:klass]}} | Nil,
           {% end %}
         {% end %}
       )
 
-      {% for name, opts in FIELDS %}
-        {% if !opts[:mass_assign] %}
-          property {{name}} : {{opts[:klass]}} | Nil
-        {% end %}
-      {% end %}
-
       def initialize(%pull : ::JSON::PullParser)
         previous_def(%pull)
+        {% for name, opts in FIELDS %}
+          {% if !opts[:mass_assign] %}
+            @{{name}} = nil
+          {% end %}
+        {% end %}
         apply_defaults
       end
     {% end %}
