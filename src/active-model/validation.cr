@@ -112,7 +112,7 @@ module ActiveModel::Validation
         {% type = @type.instance_vars.select { |ivar| ivar.name == field.id }.map(&.type)[0] %}
 
         # Using attribute for named params support
-        attribute {{field.id}}_confirmation : {{FIELDS[field.id]}}
+        attribute {{field.id}}_confirmation : {{FIELDS[field.id][:klass]}}
 
         validate {{field}}, "doesn't match confirmation", ->(this : {{@type.name}}) {
           # Don't error when nil. Use presence to explicitly throw an error here.

@@ -11,6 +11,11 @@ class BaseKlass < NoAttributes
   attribute no_default : String
 end
 
+class AttributeOptions < ActiveModel::Model
+  attribute time : Time, converter: Time::EpochConverter
+  attribute bob : String = "Bobby", mass_assignment: false
+end
+
 class Inheritance < BaseKlass
   attribute boolean : Bool = true
 
@@ -198,6 +203,20 @@ describe ActiveModel::Model do
       klass.restore_attributes
       klass.string_changed?.should eq false
       klass.string.should eq "hello"
+    end
+  end
+
+  describe "attribute options" do
+    it "should convert values using converters" do
+      AttributeOptions.attributes.should eq [:time, :bob]
+      opts = AttributeOptions.from_json(%({"time": 1459859781}))
+      opts.time.should eq Time.epoch(1459859781)
+    end
+
+    it "should not assign attributes protected from mass assignment" do
+      opts = AttributeOptions.from_json(%({"time": 1459859781, "bob": "Steve"}))
+      opts.time.should eq Time.epoch(1459859781)
+      opts.bob.should eq "Bobby"
     end
   end
 end

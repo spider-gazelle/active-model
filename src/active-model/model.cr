@@ -33,8 +33,8 @@ abstract class ActiveModel::Model
       {% fields = FIELD_MAPPINGS[name.id] %}
 
       {% if fields && !fields.empty? %}
-        {% for name, type in fields %}
-          {% FIELDS[name] = type %}
+        {% for name, opts in fields %}
+          {% FIELDS[name] = opts %}
           {% HAS_KEYS[0] = true %}
         {% end %}
       {% end %}
@@ -72,6 +72,13 @@ abstract class ActiveModel::Model
   end
 
   macro __track_changes__
+    # Define instance variable types
+    {% if HAS_KEYS[0] %}
+      {% for name, opts in FIELDS %}
+        @{{name}}_was : {{opts[:klass]}} | Nil
+      {% end %}
+    {% end %}
+
     def changed_attributes
       all = attributes
       {% for name, index in FIELDS.keys %}
@@ -131,19 +138,19 @@ abstract class ActiveModel::Model
 
   macro __create_initializer__
     def initialize(
-      {% for name, type in FIELDS %}
-        {{name}} : {{type}} | Nil = nil,
+      {% for name, opts in FIELDS %}
+        {{name}} : {{opts[:klass]}} | Nil = nil,
       {% end %}
     )
-      {% for name, type in FIELDS %}
+      {% for name, opts in FIELDS %}
         self.{{name}} = {{name}} unless {{name}}.nil?
       {% end %}
       apply_defaults
     end
 
     # Override the map json
-    {% for name, type in FIELDS %}
-      def {{name}}=(value : {{type}} | Nil)
+    {% for name, opts in FIELDS %}
+      def {{name}}=(value : {{opts[:klass]}} | Nil)
         if !@{{name}}_changed && @{{name}} != value
           @{{name}}_changed = true
           @{{name}}_was = @{{name}}
@@ -157,10 +164,22 @@ abstract class ActiveModel::Model
   macro __map_json__
     {% if HAS_KEYS[0] %}
       JSON.mapping(
-        {% for name, type in FIELDS %}
-          {{name}}: {{type}} | Nil,
+        {% for name, opts in FIELDS %}
+          {% if opts[:mass_assign] %}
+            {% if opts[:converter] %}
+              {{name}}: { type: {{opts[:klass]}} | Nil, converter: {{opts[:converter]}} },
+            {% else %}
+              {{name}}: {{opts[:klass]}} | Nil,
+            {% end %}
+          {% end %}
         {% end %}
       )
+
+      {% for name, opts in FIELDS %}
+        {% if !opts[:mass_assign] %}
+          property {{name}} : {{opts[:klass]}} | Nil
+        {% end %}
+      {% end %}
 
       def initialize(%pull : ::JSON::PullParser)
         previous_def(%pull)
@@ -169,7 +188,7 @@ abstract class ActiveModel::Model
     {% end %}
   end
 
-  macro attribute(name)
+  macro attribute(name, converter = nil, mass_assignment = true)
     # Attribute default value
     def {{name.var}}_default : {{name.type}} | Nil
       {% if name.value %}
@@ -180,8 +199,20 @@ abstract class ActiveModel::Model
     end
 
     # Save field details for finished macro
-    {% LOCAL_FIELDS[name.var] = name.type %}
-    {% FIELDS[name.var] = name.type %}
+    {%
+      LOCAL_FIELDS[name.var] = {
+        klass:       name.type,
+        converter:   converter,
+        mass_assign: mass_assignment,
+      }
+    %}
+    {%
+      FIELDS[name.var] = {
+        klass:       name.type,
+        converter:   converter,
+        mass_assign: mass_assignment,
+      }
+    %}
     {% HAS_KEYS[0] = true %}
     {% if name.value %}
       {% DEFAULTS[name.var] = name.value %}
