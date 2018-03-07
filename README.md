@@ -7,6 +7,9 @@ Active Model provides a known set of interfaces for usage in model classes. Acti
 
 ## Usage
 
+Please also checkout the [detailed guide](https://spider-gazelle.net/#/models/basics).
+
+
 ### Active Model
 
 ActiveModel::Model should be used as the base class for your ORM
