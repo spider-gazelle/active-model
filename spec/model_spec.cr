@@ -14,6 +14,8 @@ end
 class AttributeOptions < ActiveModel::Model
   attribute time : Time, converter: Time::EpochConverter
   attribute bob : String = "Bobby", mass_assignment: false
+
+  attribute weird : String | Int32
 end
 
 class Inheritance < BaseKlass
@@ -235,10 +237,10 @@ describe ActiveModel::Model do
 
   describe "attribute options" do
     it "should convert values using converters" do
-      AttributeOptions.attributes.should eq [:time, :bob]
-      opts = AttributeOptions.from_json(%({"time": 1459859781, "bob": "Angus"}))
+      AttributeOptions.attributes.should eq [:time, :bob, :weird]
+      opts = AttributeOptions.from_json(%({"time": 1459859781, "bob": "Angus", "weird": 34}))
       opts.time.should eq Time.epoch(1459859781)
-      opts.to_json.should eq %({"time":1459859781,"bob":"Bobby"})
+      opts.to_json.should eq %({"time":1459859781,"bob":"Bobby","weird":34})
     end
 
     it "should not assign attributes protected from mass assignment" do
