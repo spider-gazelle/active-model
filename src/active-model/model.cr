@@ -217,14 +217,20 @@ abstract class ActiveModel::Model
         {% end %}
       )
 
-      def initialize(%pull : ::JSON::PullParser)
+      def initialize(%pull : ::JSON::PullParser, trusted = false)
         previous_def(%pull)
-        {% for name, opts in FIELDS %}
-          {% if !opts[:mass_assign] %}
-            @{{name}} = nil
+        if !trusted
+          {% for name, opts in FIELDS %}
+            {% if !opts[:mass_assign] %}
+              @{{name}} = nil
+            {% end %}
           {% end %}
-        {% end %}
+        end
         apply_defaults
+      end
+
+      def self.from_trusted_json(json)
+        {{@type.name.id}}.new(::JSON::PullParser.new(json), true)
       end
     {% end %}
   end

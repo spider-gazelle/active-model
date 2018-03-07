@@ -248,5 +248,11 @@ describe ActiveModel::Model do
       opts.time.should eq Time.epoch(1459859781)
       opts.bob.should eq "Bobby"
     end
+
+    it "should assign attributes protected from mass assignment where data source is trusted" do
+      opts = AttributeOptions.from_trusted_json(%({"time": 1459859781, "bob": "Steve"}))
+      opts.time.should eq Time.epoch(1459859781)
+      opts.bob.should eq "Steve"
+    end
   end
 end
