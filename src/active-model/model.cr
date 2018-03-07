@@ -1,4 +1,5 @@
 require "json"
+require "http/params"
 
 abstract class ActiveModel::Model
   FIELD_MAPPINGS = {} of Nil => Nil
@@ -145,6 +146,49 @@ abstract class ActiveModel::Model
       {% for name, opts in FIELDS %}
         self.{{name}} = {{name}} unless {{name}}.nil?
       {% end %}
+      apply_defaults
+    end
+
+    # Accept HTTP params
+    def initialize(params : HTTP::Params | Hash(String, String) | Tuple(String, String))
+      {% for name, opts in FIELDS %}
+        {% if opts[:mass_assign] %}
+          value = params[{{name.stringify}}]?
+          if value
+            {% coerce = opts[:klass].stringify %}
+            {% if coerce == "String" %}
+              self.{{name}} = value
+            {% elsif coerce == "Int8" %}
+              self.{{name}} = value.to_i8
+            {% elsif coerce == "Int16" %}
+              self.{{name}} = value.to_i16
+            {% elsif coerce == "Int32" %}
+              self.{{name}} = value.to_i32
+            {% elsif coerce == "Int64" %}
+              self.{{name}} = value.to_i64
+            {% elsif coerce == "UInt8" %}
+              self.{{name}} = value.to_u8
+            {% elsif coerce == "UInt16" %}
+              self.{{name}} = value.to_u16
+            {% elsif coerce == "UInt32" %}
+              self.{{name}} = value.to_u32
+            {% elsif coerce == "UInt64" %}
+              self.{{name}} = value.to_u64
+            {% elsif coerce == "BigDecimal" %}
+              self.{{name}} = value.to_big_d
+            {% elsif coerce == "BigInt" %}
+              self.{{name}} = value.to_big_i
+            {% elsif coerce == "Float32" %}
+              self.{{name}} = value.to_f32
+            {% elsif coerce == "Float64" %}
+              self.{{name}} = value.to_f64
+            {% elsif coerce == "Bool" %}
+              self.{{name}} = value[0].downcase == 't'
+            {% end %}
+          end
+        {% end %}
+      {% end %}
+
       apply_defaults
     end
 

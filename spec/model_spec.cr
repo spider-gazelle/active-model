@@ -94,6 +94,33 @@ describe ActiveModel::Model do
         :no_default => nil,
       })
     end
+
+    it "uses HTTP Params for initialization" do
+      params = HTTP::Params.new({"string" => ["bob"], "no_default" => ["jane"]})
+      bk = BaseKlass.new params
+
+      bk.attributes.should eq({
+        :string     => "bob",
+        :integer    => 45,
+        :no_default => "jane",
+      })
+
+      i = Inheritance.new({"string" => "bob", "no_default" => "jane", "boolean" => "True"})
+      i.attributes.should eq({
+        :boolean    => true,
+        :string     => "bob",
+        :integer    => 45,
+        :no_default => "jane",
+      })
+
+      i = Inheritance.new({"string" => "bob", "integer" => "123", "boolean" => "false"})
+      i.attributes.should eq({
+        :boolean    => false,
+        :string     => "bob",
+        :integer    => 123,
+        :no_default => nil,
+      })
+    end
   end
 
   describe "attribute accessors" do
