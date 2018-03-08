@@ -74,15 +74,9 @@ module ActiveModel::Validation
       {% for field, index in fields %}
         validate {{field}}, "is required", ->(this : {{@type.name}}) {
           value = this.{{field.id}}
-          if !value.nil?
-            if !allow_blank && value.responds_to?(:empty?)
-              !value.empty?
-            else
-              true
-            end
-          else
-            false
-          end
+          return false if value.nil?
+          return !value.empty? if !allow_blank && value.responds_to?(:empty?)
+          true
         }, {{options[:if]}}, {{options[:unless]}}
       {% end %}
     {% end %}
@@ -216,9 +210,10 @@ module ActiveModel::Validation
     {% if absence %}
       {% for field, index in fields %}
         validate {{field}}, "is present", ->(this : {{@type.name}}) {
-          data = this.{{field.id}}
-          return false if data && !data.empty?
-          true
+          value = this.{{field.id}}
+          return true if value.nil?
+          return value.empty? if value.responds_to?(:empty?)
+          false
         }, {{options[:if]}}, {{options[:unless]}}
       {% end %}
     {% end %}
