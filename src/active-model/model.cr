@@ -235,7 +235,7 @@ abstract class ActiveModel::Model
     {% end %}
   end
 
-  macro attribute(name, converter = nil, mass_assignment = true)
+  macro attribute(name, converter = nil, mass_assignment = true, persistence = true)
     # Attribute default value
     def {{name.var}}_default : {{name.type}} | Nil
       {% if name.value %}
@@ -248,16 +248,18 @@ abstract class ActiveModel::Model
     # Save field details for finished macro
     {%
       LOCAL_FIELDS[name.var] = {
-        klass:       name.type,
-        converter:   converter,
-        mass_assign: mass_assignment,
+        klass:          name.type,
+        converter:      converter,
+        mass_assign:    mass_assignment,
+        should_persist: persistence,
       }
     %}
     {%
       FIELDS[name.var] = {
-        klass:       name.type,
-        converter:   converter,
-        mass_assign: mass_assignment,
+        klass:          name.type,
+        converter:      converter,
+        mass_assign:    mass_assignment,
+        should_persist: persistence,
       }
     %}
     {% HAS_KEYS[0] = true %}

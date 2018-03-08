@@ -126,12 +126,21 @@ module ActiveModel::Validation
         {% type = @type.instance_vars.select { |ivar| ivar.name == field.id }.map(&.type)[0] %}
 
         # Using attribute for named params support
-        attribute {{field.id}}_confirmation : {{FIELDS[field.id][:klass]}}
+        attribute {{field.id}}_confirmation : {{FIELDS[field.id][:klass]}}, persistence: false
 
         validate {{field}}, "doesn't match confirmation", ->(this : {{@type.name}}) {
           # Don't error when nil. Use presence to explicitly throw an error here.
           confirmation = this.{{field.id}}_confirmation || this.{{field.id}}
-          this.{{field.id}} == confirmation
+
+          {% if confirmation == true || confirmation[:case_sensitive] != false %}
+            this.{{field.id}} == confirmation
+          {% else %}
+            if confirmation.nil? || this.{{field.id}}.nil?
+              this.{{field.id}} == confirmation
+            else
+              this.{{field.id}}.not_nil!.downcase == confirmation.not_nil!.downcase
+            end
+          {% end %}
         }, {{options[:if]}}, {{options[:unless]}}
       {% end %}
     {% end %}

@@ -23,6 +23,7 @@ class Person < ORM
   validates :rating, numericality: {greater_than_or_equal_to: 0, less_than_or_equal_to: 100, allow_nil: true}
 
   validates :gender, confirmation: true
+  validates :email, confirmation: {case_sensitive: false}
 
   validates :email, format: {
     :with    => /@/,
@@ -104,6 +105,11 @@ describe ActiveModel::Validation do
 
       # A nil version of the confirmation is ignored
       person = Person.new name: "bob", gender: "female"
+      person.valid?.should eq true
+    end
+
+    it "should be case insensitive when requested" do
+      person = Person.new name: "bob", email: "steve@acaprojects.com", email_confirmation: "Steve@ACAprojects.com"
       person.valid?.should eq true
     end
 
