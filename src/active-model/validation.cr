@@ -45,12 +45,15 @@ module ActiveModel::Validation
     validate :__base__, {{message}}, {{block}}, {{options[:if]}}, {{options[:unless]}}
   end
 
-  macro __numericality__(fields, num, message, operation, positive, negative)
+  macro __numericality__(allow_nil, fields, num, message, operation, positive, negative)
     {% if num %}
       {% for field, index in fields %}
         validate({{field}}, "{{message.id}} {{num}}", ->(this : {{@type.name}}) {
           number = this.{{field.id}}
-          return true unless number.is_a?(Number)
+          if number.nil?
+            return false unless {{allow_nil}}
+            return true
+          end
           number {{operation.id}} {{num}}
         }, {{positive}}, {{negative}})
       {% end %}
@@ -68,33 +71,36 @@ module ActiveModel::Validation
                   absence = nil,
                   **options)
 
-    allow_blank = {{options[:allow_blank]}}
+    {% allow_blank = options[:allow_blank] %}
 
     {% if presence %}
       {% for field, index in fields %}
         validate {{field}}, "is required", ->(this : {{@type.name}}) {
           value = this.{{field.id}}
           return false if value.nil?
-          return !value.empty? if !allow_blank && value.responds_to?(:empty?)
+          return !value.empty? if !{{allow_blank}} && value.responds_to?(:empty?)
           true
         }, {{options[:if]}}, {{options[:unless]}}
       {% end %}
     {% end %}
 
     {% if numericality %}
-      __numericality__({{fields}}, {{numericality[:greater_than]}}, "must be greater than", ">", {{options[:if]}}, {{options[:unless]}})
-      __numericality__({{fields}}, {{numericality[:greater_than_or_equal_to]}}, "must be greater than or equal to", ">=", {{options[:if]}}, {{options[:unless]}})
-      __numericality__({{fields}}, {{numericality[:equal_to]}}, "must be equal to", "==", {{options[:if]}}, {{options[:unless]}})
-      __numericality__({{fields}}, {{numericality[:less_than]}}, "must be less than", "<", {{options[:if]}}, {{options[:unless]}})
-      __numericality__({{fields}}, {{numericality[:less_than_or_equal_to]}}, "must be less than or equal to", "<=", {{options[:if]}}, {{options[:unless]}})
-      __numericality__({{fields}}, {{numericality[:other_than]}}, "must be other than", "!=", {{options[:if]}}, {{options[:unless]}})
+      __numericality__({{numericality[:allow_nil]}}, {{fields}}, {{numericality[:greater_than]}}, "must be greater than", ">", {{options[:if]}}, {{options[:unless]}})
+      __numericality__({{numericality[:allow_nil]}}, {{fields}}, {{numericality[:greater_than_or_equal_to]}}, "must be greater than or equal to", ">=", {{options[:if]}}, {{options[:unless]}})
+      __numericality__({{numericality[:allow_nil]}}, {{fields}}, {{numericality[:equal_to]}}, "must be equal to", "==", {{options[:if]}}, {{options[:unless]}})
+      __numericality__({{numericality[:allow_nil]}}, {{fields}}, {{numericality[:less_than]}}, "must be less than", "<", {{options[:if]}}, {{options[:unless]}})
+      __numericality__({{numericality[:allow_nil]}}, {{fields}}, {{numericality[:less_than_or_equal_to]}}, "must be less than or equal to", "<=", {{options[:if]}}, {{options[:unless]}})
+      __numericality__({{numericality[:allow_nil]}}, {{fields}}, {{numericality[:other_than]}}, "must be other than", "!=", {{options[:if]}}, {{options[:unless]}})
 
       {% num = numericality[:odd] %}
       {% if num %}
         {% for field, index in fields %}
           validate {{field}}, "must be odd", ->(this : {{@type.name}}) {
             number = this.{{field.id}}
-            return true unless number.is_a?(Number)
+            if number.nil?
+              return false unless {{numericality[:allow_nil]}}
+              return true
+            end
             number % 2 == 1
           }, {{options[:if]}}, {{options[:unless]}}
         {% end %}
@@ -105,7 +111,10 @@ module ActiveModel::Validation
         {% for field, index in fields %}
           validate {{field}}, "must be even", ->(this : {{@type.name}}) {
             number = this.{{field.id}}
-            return true unless number.is_a?(Number)
+            if number.nil?
+              return false unless {{numericality[:allow_nil]}}
+              return true
+            end
             number % 2 == 0
           }, {{options[:if]}}, {{options[:unless]}}
         {% end %}
@@ -132,7 +141,7 @@ module ActiveModel::Validation
         validate {{field}}, {{format[:message]}} || "is invalid", ->(this : {{@type.name}}) {
           data = this.{{field.id}}
           return true if data.nil?
-          return true if allow_blank && data.empty?
+          return true if {{allow_blank}} && data.empty?
 
           {% if format[:with] %}
             return false unless data =~ {{format[:with]}}
@@ -173,7 +182,7 @@ module ActiveModel::Validation
           validate {{field}}, {{length[:too_short]}} || "is too short", ->(this : {{@type.name}}) {
             data = this.{{field.id}}
             return true if data.nil?
-            return true if allow_blank && data.empty?
+            return true if {{allow_blank}} && data.empty?
             data.size >= {{length[:minimum]}}
           }, {{options[:if]}}, {{options[:unless]}}
         {% end %}
@@ -182,7 +191,7 @@ module ActiveModel::Validation
           validate {{field}}, {{length[:too_long]}} || "is too long", ->(this : {{@type.name}}) {
             data = this.{{field.id}}
             return true if data.nil?
-            return true if allow_blank && data.empty?
+            return true if {{allow_blank}} && data.empty?
             data.size <= {{length[:maximum]}}
           }, {{options[:if]}}, {{options[:unless]}}
         {% end %}
@@ -191,7 +200,7 @@ module ActiveModel::Validation
           validate {{field}}, {{length[:wrong_length]}} || "is the wrong length", ->(this : {{@type.name}}) {
             data = this.{{field.id}}
             return true if data.nil?
-            return true if allow_blank && data.empty?
+            return true if {{allow_blank}} && data.empty?
             {{length[:in] || length[:within]}}.includes?(data)
           }, {{options[:if]}}, {{options[:unless]}}
         {% end %}
@@ -200,7 +209,7 @@ module ActiveModel::Validation
           validate {{field}}, {{length[:wrong_length]}} || "is the wrong length", ->(this : {{@type.name}}) {
             data = this.{{field.id}}
             return true if data.nil?
-            return true if allow_blank && data.empty?
+            return true if {{allow_blank}} && data.empty?
             data.size == {{length[:is]}}
           }, {{options[:if]}}, {{options[:unless]}}
         {% end %}

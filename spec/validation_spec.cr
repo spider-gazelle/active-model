@@ -13,12 +13,14 @@ end
 class Person < ORM
   attribute name : String
   attribute age : Int32 = 32
+  attribute rating : Int32
   attribute gender : String
   attribute adult : Bool = true
   attribute email : String
 
   validates :name, presence: true, length: {minimum: 3, too_short: "must be 3 characters long"}
-  validates :age, presence: true, numericality: {:greater_than => 5}
+  validates :age, numericality: {:greater_than => 5}
+  validates :rating, numericality: {greater_than_or_equal_to: 0, less_than_or_equal_to: 100, allow_nil: true}
 
   validates :gender, confirmation: true
 
@@ -69,7 +71,7 @@ describe ActiveModel::Validation do
       person = Person.new name: "bob"
       person.age = nil
       person.valid?.should eq false
-      person.errors[0].to_s.should eq "Age is required"
+      person.errors[0].to_s.should eq "Age must be greater than 5"
     end
   end
 
@@ -78,6 +80,19 @@ describe ActiveModel::Validation do
       person = Person.new name: "bob", age: 5
       person.valid?.should eq false
       person.errors[0].to_s.should eq "Age must be greater than 5"
+    end
+
+    it "returns false if rating is not set correctly" do
+      person = Person.new name: "bob", age: 6, rating: -1
+      person.valid?.should eq false
+      person.errors[0].to_s.should eq "Rating must be greater than or equal to 0"
+
+      person = Person.new name: "bob", age: 6, rating: 101
+      person.valid?.should eq false
+      person.errors[0].to_s.should eq "Rating must be less than or equal to 100"
+
+      person = Person.new name: "bob", age: 6, rating: 50
+      person.valid?.should eq true
     end
   end
 
