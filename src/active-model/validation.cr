@@ -72,7 +72,18 @@ module ActiveModel::Validation
 
     {% if presence %}
       {% for field, index in fields %}
-        validate {{field}}, "is required", ->(this : {{@type.name}}) { !this.{{field.id}}.nil? }, {{options[:if]}}, {{options[:unless]}}
+        validate {{field}}, "is required", ->(this : {{@type.name}}) {
+          value = this.{{field.id}}
+          if !value.nil?
+            if !allow_blank && value.responds_to?(:empty?)
+              !value.empty?
+            else
+              true
+            end
+          else
+            false
+          end
+        }, {{options[:if]}}, {{options[:unless]}}
       {% end %}
     {% end %}
 

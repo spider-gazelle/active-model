@@ -59,6 +59,10 @@ describe ActiveModel::Validation do
       person = Person.new
       person.valid?.should eq false
       person.errors[0].to_s.should eq "Name is required"
+
+      person = Person.new(name: "")
+      person.valid?.should eq false
+      person.errors[0].to_s.should eq "Name is required"
     end
 
     it "returns false if age is not present" do
