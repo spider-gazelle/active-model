@@ -1,5 +1,5 @@
 module ActiveModel
-  VERSION = "0.1.0"
+  VERSION = "1.0.1"
 end
 
 require "./active-model/*"
