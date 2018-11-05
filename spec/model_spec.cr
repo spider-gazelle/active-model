@@ -239,19 +239,19 @@ describe ActiveModel::Model do
     it "should convert values using converters" do
       AttributeOptions.attributes.should eq [:time, :bob, :weird]
       opts = AttributeOptions.from_json(%({"time": 1459859781, "bob": "Angus", "weird": 34}))
-      opts.time.should eq Time.epoch(1459859781)
+      opts.time.should eq Time.unix(1459859781)
       opts.to_json.should eq %({"time":1459859781,"bob":"Bobby","weird":34})
     end
 
     it "should not assign attributes protected from mass assignment" do
       opts = AttributeOptions.from_json(%({"time": 1459859781, "bob": "Steve"}))
-      opts.time.should eq Time.epoch(1459859781)
+      opts.time.should eq Time.unix(1459859781)
       opts.bob.should eq "Bobby"
     end
 
     it "should assign attributes protected from mass assignment where data source is trusted" do
       opts = AttributeOptions.from_trusted_json(%({"time": 1459859781, "bob": "Steve"}))
-      opts.time.should eq Time.epoch(1459859781)
+      opts.time.should eq Time.unix(1459859781)
       opts.bob.should eq "Steve"
     end
   end
