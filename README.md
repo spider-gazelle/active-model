@@ -105,5 +105,10 @@ class Person < ActiveModel::Model
   def capitalize
     @name = @name.capitalize
   end
+
+  def save
+    __before_save
+    # Save to db
+  end
 end
 ```

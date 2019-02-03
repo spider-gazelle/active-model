@@ -12,15 +12,23 @@ class CallbackModel < BaseOrm
 
   {% for crud in {:create, :save, :update, :destroy} %}
     def {{ crud.id }}
+      __before_{{ crud.id }}
+      __{{ crud.id }}
+      __after_{{ crud.id }}
+    end
+
+    def __{{ crud.id }}
       history << {{ crud.id.stringify }}
     end
   {% end %}
+
+
 
   {% for callback in ActiveModel::Callbacks::CALLBACK_NAMES %}
     {{ callback.id }} :__{{ callback.id }}
     private def __{{ callback.id }}
       history << {{ callback.id.stringify }}
-      raise IO::Error, "Launching missiles!" if @raises
+      raise "Launching missiles!" if @raises
     end
   {% end %}
 end
@@ -79,7 +87,7 @@ describe ActiveModel::Callbacks do
   describe "an exception thrown in a hook" do
     it "should not get swallowed" do
       callback = CallbackModel.new(name: "foo", raises: true)
-      expect_raises(IO::Error, "Launching missiles!") do
+      expect_raises(Exception, "Launching missiles!") do
         callback.save
       end
     end
