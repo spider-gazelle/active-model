@@ -84,5 +84,26 @@ person.name_was # => nil
 
 person.clear_changes_information
 person.changed? # => false
+```
 
+#### Callbacks
+
+Register before/after callbacks for `create`, `update`, `delete`, `save` methods.
+You must define the method you wish to register callbacks for.
+
+```crystal
+require "active-model"
+
+class Person < ActiveModel::Model
+  include ActiveModel::Callbacks
+
+  attribute name : String
+  attribute age : Int32
+
+  before_save :capitalize
+
+  def capitalize
+    @name = @name.capitalize
+  end
+end
 ```
