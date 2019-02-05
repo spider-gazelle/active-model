@@ -12,17 +12,11 @@ class CallbackModel < BaseOrm
 
   {% for crud in {:create, :save, :update, :destroy} %}
     def {{ crud.id }}
-      __before_{{ crud.id }}
-      __{{ crud.id }}
-      __after_{{ crud.id }}
-    end
-
-    def __{{ crud.id }}
-      history << {{ crud.id.stringify }}
+      run_{{ crud.id }}_callbacks do
+        history << {{ crud.id.stringify }}
+      end
     end
   {% end %}
-
-
 
   {% for callback in ActiveModel::Callbacks::CALLBACK_NAMES %}
     {{ callback.id }} :__{{ callback.id }}
@@ -41,6 +35,12 @@ class Hero < BaseOrm
 
   private def __before_create
     @id = @name.try(&.size)
+  end
+
+  def create
+    run_create_callbacks do
+      true
+    end
   end
 end
 
@@ -81,6 +81,17 @@ describe ActiveModel::Callbacks do
 
       order = ["before_destroy", "destroy", "after_destroy"]
       callback.history.should eq order
+    end
+  end
+
+  describe "subset of callbacks" do
+    it "executes registered callbacks" do
+      hero = Hero.new(name: "footbath")
+      result = hero.create
+
+      result.should be_true
+      hero.id.should be_a(Int32)
+      hero.id.should eq hero.name.try(&.size)
     end
   end
 

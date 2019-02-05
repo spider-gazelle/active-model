@@ -89,7 +89,8 @@ person.changed? # => false
 #### Callbacks
 
 Register before/after callbacks for `create`, `update`, `delete`, `save` methods.
-You must define the method you wish to register callbacks for.
+You must define the method you wish to register callbacks for.  
+Registered callbacks are invoked through wrapping crud logic with the `run_create_callbacks`, `run_update_callbacks`, etc. functions
 
 ```crystal
 require "active-model"
@@ -107,8 +108,10 @@ class Person < ActiveModel::Model
   end
 
   def save
-    __before_save
-    # Save to db
+    run_save_callbacks do
+      # save to database
+      @foo.save(attributes)
+    end
   end
 end
 ```

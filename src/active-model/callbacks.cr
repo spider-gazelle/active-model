@@ -14,6 +14,16 @@ module ActiveModel::Callbacks
           __{{name.id}}
         end
       {% end %}
+
+      # Wrap a block with callbacks for the appropriate crud operation
+      {% for crud in {:create, :save, :update, :destroy} %}
+      def run_{{crud.id}}_callbacks(&block)
+        __before_{{crud.id}}
+        result = yield
+        __after_{{crud.id}}
+        result
+      end
+      {% end %}
     end
   end
 
@@ -39,8 +49,4 @@ module ActiveModel::Callbacks
       \{% end %}
     end
   {% end %}
-
-  def run_callbacks(callback, &block)
-    # TODO: Require crystal equivalent of send
-  end
 end
