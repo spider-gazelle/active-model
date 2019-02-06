@@ -19,6 +19,7 @@ abstract class ActiveModel::Model
       __track_changes__
       __map_json__
       __create_initializer__
+      __create_assign_attributes__
     end
   end
 
@@ -151,44 +152,7 @@ abstract class ActiveModel::Model
 
     # Accept HTTP params
     def initialize(params : HTTP::Params | Hash(String, String) | Tuple(String, String))
-      {% for name, opts in FIELDS %}
-        {% if opts[:mass_assign] %}
-          value = params[{{name.stringify}}]?
-          if value
-            {% coerce = opts[:klass].stringify %}
-            {% if coerce == "String" %}
-              self.{{name}} = value
-            {% elsif coerce == "Int8" %}
-              self.{{name}} = value.to_i8
-            {% elsif coerce == "Int16" %}
-              self.{{name}} = value.to_i16
-            {% elsif coerce == "Int32" %}
-              self.{{name}} = value.to_i32
-            {% elsif coerce == "Int64" %}
-              self.{{name}} = value.to_i64
-            {% elsif coerce == "UInt8" %}
-              self.{{name}} = value.to_u8
-            {% elsif coerce == "UInt16" %}
-              self.{{name}} = value.to_u16
-            {% elsif coerce == "UInt32" %}
-              self.{{name}} = value.to_u32
-            {% elsif coerce == "UInt64" %}
-              self.{{name}} = value.to_u64
-            {% elsif coerce == "BigDecimal" %}
-              self.{{name}} = value.to_big_d
-            {% elsif coerce == "BigInt" %}
-              self.{{name}} = value.to_big_i
-            {% elsif coerce == "Float32" %}
-              self.{{name}} = value.to_f32
-            {% elsif coerce == "Float64" %}
-              self.{{name}} = value.to_f64
-            {% elsif coerce == "Bool" %}
-              self.{{name}} = value[0].downcase == 't'
-            {% end %}
-          end
-        {% end %}
-      {% end %}
-
+      __from_object_params__(params)
       apply_defaults
     end
 
@@ -232,6 +196,65 @@ abstract class ActiveModel::Model
       def self.from_trusted_json(json)
         {{@type.name.id}}.new(::JSON::PullParser.new(json), true)
       end
+    {% end %}
+  end
+
+  macro __create_assign_attributes__
+    def assign_attributes(
+      {% for name, opts in FIELDS %}
+        {{name}} : {{opts[:klass]}} | Nil = nil,
+      {% end %}
+    )
+      {% for name, opts in FIELDS %}
+        {% if opts[:mass_assign] %}
+          self.{{name}} = {{name}} unless {{ name }}.nil?
+        {% end %}
+      {% end %}
+    end
+
+    # Accept HTTP params
+    def assign_attributes(params : HTTP::Params | Hash(String, String) | Tuple(String, String))
+      __from_object_params__(params)
+    end
+  end
+
+  macro __from_object_params__(params)
+    {% for name, opts in FIELDS %}
+      {% if opts[:mass_assign] %}
+        value = {{ params.id }}[{{name.stringify}}]?
+        if value
+          {% coerce = opts[:klass].stringify %}
+          {% if coerce == "String" %}
+            self.{{name}} = value
+          {% elsif coerce == "Int8" %}
+            self.{{name}} = value.to_i8
+          {% elsif coerce == "Int16" %}
+            self.{{name}} = value.to_i16
+          {% elsif coerce == "Int32" %}
+            self.{{name}} = value.to_i32
+          {% elsif coerce == "Int64" %}
+            self.{{name}} = value.to_i64
+          {% elsif coerce == "UInt8" %}
+            self.{{name}} = value.to_u8
+          {% elsif coerce == "UInt16" %}
+            self.{{name}} = value.to_u16
+          {% elsif coerce == "UInt32" %}
+            self.{{name}} = value.to_u32
+          {% elsif coerce == "UInt64" %}
+            self.{{name}} = value.to_u64
+          {% elsif coerce == "BigDecimal" %}
+            self.{{name}} = value.to_big_d
+          {% elsif coerce == "BigInt" %}
+            self.{{name}} = value.to_big_i
+          {% elsif coerce == "Float32" %}
+            self.{{name}} = value.to_f32
+          {% elsif coerce == "Float64" %}
+            self.{{name}} = value.to_f64
+          {% elsif coerce == "Bool" %}
+            self.{{name}} = value[0].downcase == 't'
+          {% end %}
+        end
+      {% end %}
     {% end %}
   end
 
