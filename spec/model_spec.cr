@@ -165,6 +165,55 @@ describe ActiveModel::Model do
     end
   end
 
+  describe "assign_attributes" do
+    it "assigns several attributes" do
+      bk = BaseKlass.new
+      bk.attributes.should eq({
+        :string     => "hello",
+        :integer    => 45,
+        :no_default => nil,
+      })
+
+      bk.assign_attributes(string: "what", integer: 42, no_default: "bath")
+      bk.attributes.should eq({
+        :string     => "what",
+        :integer    => 42,
+        :no_default => "bath",
+      })
+    end
+
+    it "affects changes metadata" do
+      bk = BaseKlass.new
+      bk.clear_changes_information
+
+      bk.assign_attributes(string: "what")
+      bk.changed_attributes.should eq({
+        :string => "what",
+      })
+    end
+
+    it "uses HTTP Params for initialization" do
+      bk = BaseKlass.new
+      params = HTTP::Params.new({"string" => ["bob"], "no_default" => ["jane"]})
+      bk.assign_attributes(params)
+
+      bk.attributes.should eq({
+        :string     => "bob",
+        :integer    => 45,
+        :no_default => "jane",
+      })
+    end
+
+    it "respects mass assignment preference option" do
+      options = AttributeOptions.new
+
+      time = Time.unix(1459859781)
+      options.assign_attributes(time: time, bob: "Bilbo")
+      options.time.should eq time
+      options.bob.should eq "Bobby"
+    end
+  end
+
   describe "serialization" do
     it "should support to_json" do
       i = Inheritance.new
