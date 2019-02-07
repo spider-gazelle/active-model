@@ -1,5 +1,5 @@
 name: active-model
-version: 1.0.1
+version: 1.1.0
 
 development_dependencies:
   ameba:
@@ -7,5 +7,6 @@ development_dependencies:
 
 authors:
   - Stephen von Takach <steve@acaprojects.com>
+  - Caspian Baska <caspianbaska@gmail.com>
 
 license: MIT
