@@ -68,8 +68,8 @@ abstract class ActiveModel::Model
       ] {% if !HAS_KEYS[0] %} of Nil {% end %}
     end
 
-    # Returns a hash of all persistable attributes
-    def persistable_attributes
+    # Returns a hash of all attributes that may be persisted
+    def persistent_attributes
       {
         {% for name, index in FIELDS.keys %}
           {% if FIELDS[name][:should_persist] %}

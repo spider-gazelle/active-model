@@ -312,7 +312,7 @@ describe ActiveModel::Model do
       weird = "object"
 
       opts = AttributeOptions.new(time: time, bob: bob, feeling: feeling, weird: weird)
-      opts.persistable_attributes.should eq ({
+      opts.persistent_attributes.should eq ({
         :time  => time,
         :bob   => bob,
         :weird => weird,
