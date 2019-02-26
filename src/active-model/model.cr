@@ -67,6 +67,17 @@ abstract class ActiveModel::Model
         {% end %}
       ] {% if !HAS_KEYS[0] %} of Nil {% end %}
     end
+
+    # Returns a hash of all persistable attributes
+    def persistable_attributes
+      {
+        {% for name, index in FIELDS.keys %}
+          {% if FIELDS[name][:should_persist] %}
+          :{{name}} => @{{name}},
+          {% end %}
+        {% end %}
+      } {% if !HAS_KEYS[0] %} of Nil => Nil {% end %}
+    end
   end
 
   # For overriding in parent classes

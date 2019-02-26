@@ -15,6 +15,7 @@ class AttributeOptions < ActiveModel::Model
   attribute time : Time, converter: Time::EpochConverter
   attribute bob : String = "Bobby", mass_assignment: false
 
+  attribute feeling : String, persistence: false
   attribute weird : String | Int32
 end
 
@@ -286,7 +287,7 @@ describe ActiveModel::Model do
 
   describe "attribute options" do
     it "should convert values using converters" do
-      AttributeOptions.attributes.should eq [:time, :bob, :weird]
+      AttributeOptions.attributes.should eq [:time, :bob, :feeling, :weird]
       opts = AttributeOptions.from_json(%({"time": 1459859781, "bob": "Angus", "weird": 34}))
       opts.time.should eq Time.unix(1459859781)
       opts.to_json.should eq %({"time":1459859781,"bob":"Bobby","weird":34})
@@ -302,6 +303,26 @@ describe ActiveModel::Model do
       opts = AttributeOptions.from_trusted_json(%({"time": 1459859781, "bob": "Steve"}))
       opts.time.should eq Time.unix(1459859781)
       opts.bob.should eq "Steve"
+    end
+
+    it "should allow non-persisted values" do
+      time = Time.unix 420420420
+      bob = "sick"
+      feeling = "ill"
+      weird = "object"
+
+      opts = AttributeOptions.new(time: time, bob: bob, feeling: feeling, weird: weird)
+      opts.persistable_attributes.should eq ({
+        :time  => time,
+        :bob   => bob,
+        :weird => weird,
+      })
+      opts.attributes.should eq ({
+        :time    => time,
+        :bob     => bob,
+        :weird   => weird,
+        :feeling => feeling,
+      })
     end
   end
 end
