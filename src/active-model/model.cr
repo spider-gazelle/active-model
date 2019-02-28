@@ -46,7 +46,11 @@ abstract class ActiveModel::Model
     def apply_defaults
       super
       {% for name, data in DEFAULTS %}
-        self.{{name}} = {{data}} if @{{name}}.nil?
+        {% if data.is_a?(ProcLiteral) %}
+          self.{{name}} = ( {{data}} ).call if @{{name}}.nil?
+        {% else %}
+          self.{{name}} = {{data}} if @{{name}}.nil?
+        {% end %}
       {% end %}
     end
 
