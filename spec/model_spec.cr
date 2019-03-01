@@ -31,6 +31,23 @@ class Inheritance < BaseKlass
   end
 end
 
+class EnumAttributes < ActiveModel::Model
+  enum Size
+    Small
+    Medium
+    Large
+  end
+
+  enum Product
+    Nuggets
+    Burger
+    Fries
+  end
+
+  enum_attribute size : Size, column_type: Int32
+  enum_attribute product : Product = Product::Fries
+end
+
 class Changes < BaseKlass
   attribute arr : Array(Int32) = [1, 2, 3]
 end
@@ -163,6 +180,31 @@ describe ActiveModel::Model do
         :integer    => 45,
         :no_default => nil,
       })
+    end
+  end
+
+  describe "enum_attributes" do
+    it "should allow enums as attributes" do
+      model = EnumAttributes.new(size: EnumAttributes::Size::Medium)
+      model.size.should eq EnumAttributes::Size::Medium
+      model.product.should eq EnumAttributes::Product::Fries
+    end
+
+    it "should serialize/deserialize enum attributes" do
+      model = EnumAttributes.new(size: EnumAttributes::Size::Medium)
+
+      model_json = model.to_json
+      parsed_model = EnumAttributes.from_trusted_json(model_json)
+      parsed_model.product.should eq model.product
+      parsed_model.size.should eq model.size
+      parsed_model.attributes.should eq model.attributes
+    end
+
+    it "should serialize enum attributes to a concrete value" do
+      model = EnumAttributes.new(size: EnumAttributes::Size::Medium)
+
+      model._size_int.should eq EnumAttributes::Size::Medium.value
+      model._product_int.should eq EnumAttributes::Product::Fries.to_i
     end
   end
 

@@ -10,6 +10,7 @@ abstract class ActiveModel::Model
     DEFAULTS = {} of Nil => Nil
     HAS_KEYS = [false]
     FIELDS = {} of Nil => Nil
+    ENUM_FIELDS = {} of Nil => Nil
 
 
     # Process attributes must be called while constants are in scope
@@ -82,6 +83,33 @@ abstract class ActiveModel::Model
         {% end %}
       } {% if !HAS_KEYS[0] %} of Nil => Nil {% end %}
     end
+
+    {% for name, index in ENUM_FIELDS.keys %}
+        {% enum_type = ENUM_FIELDS[name][:enum_type].id %}
+        {% column_type = ENUM_FIELDS[name][:column_type].id %}
+        {% column_name = ENUM_FIELDS[name][:column_name].id %}
+
+        {% if column_type.stringify == "String" %}
+          def {{name}} : {{enum_type}}
+            @{{name}} ||= {{enum_type}}.parse(@{{column_name}}.to_s)
+          end
+
+          def {{name}}=(val : {{enum_type}})
+            @{{name}} = val
+            @{{column_name}} = val.to_s
+          end
+
+        {% elsif column_type.stringify == "Int32" %}
+          def {{name}} : {{enum_type}}
+            @{{name}} ||= {{enum_type}}.new(@{{column_name}}.not_nil!.to_i32)
+          end
+
+          def {{name}}=(val : {{enum_type}})
+            @{{name}} = val
+            @{{column_name}} = val.value
+          end
+        {% end %}
+    {% end %}
   end
 
   # For overriding in parent classes
@@ -158,10 +186,17 @@ abstract class ActiveModel::Model
       {% for name, opts in FIELDS %}
         {{name}} : {{opts[:klass]}} | Nil = nil,
       {% end %}
+      {% for name, opts in ENUM_FIELDS %}
+        {{name}} : {{opts[:enum_type]}} | Nil = nil,
+      {% end %}
     )
       {% for name, opts in FIELDS %}
         self.{{name}} = {{name}} unless {{name}}.nil?
       {% end %}
+      {% for name, opts in ENUM_FIELDS %}
+        self.{{name}} = {{name}} unless {{name}}.nil?
+      {% end %}
+
       apply_defaults
     end
 
@@ -273,6 +308,38 @@ abstract class ActiveModel::Model
     {% end %}
   end
 
+  # Allow enum attributes. Persisted as either String | Int32
+  macro enum_attribute(name, column_type = Int32, mass_assignment = true, persistence = true)
+    {% enum_type = name.type %}
+
+    # Define a column name for the serialized enum value
+    {% if column_type.stringify == "String" %}
+    {% column_name = ("_" + enum_type.stringify.downcase + "_str").id %}
+    {% elsif column_type.stringify == "Int32" %}
+    {% column_name = ("_" + enum_type.stringify.downcase + "_int").id %}
+    {% end %}
+
+    # Default enum value serialization
+    {% if name.value %}
+      {% if column_type.stringify == "String" %}
+        attribute {{ column_name }} : String = {{ name.value }}.to_s
+      {% elsif column_type.stringify == "Int32" %}
+        attribute {{ column_name }} : Int32 = {{ name.value }}.to_i
+      {% end %}
+    {% else %}
+        # No default
+        attribute {{ column_name }} : {{ column_type.id }}
+    {% end %}
+
+    {%
+      ENUM_FIELDS[name.var] = {
+        enum_type:   enum_type.id,
+        column_type: column_type.id,
+        column_name: column_name.id,
+      }
+    %}
+  end
+
   macro attribute(name, converter = nil, mass_assignment = true, persistence = true)
     # Attribute default value
     def {{name.var}}_default : {{name.type}} | Nil
@@ -283,7 +350,7 @@ abstract class ActiveModel::Model
       {% end %}
     end
 
-    # Save field details for finished macro
+
     {%
       LOCAL_FIELDS[name.var] = {
         klass:          name.type,
