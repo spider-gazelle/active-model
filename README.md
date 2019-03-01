@@ -4,11 +4,9 @@
 
 Active Model provides a known set of interfaces for usage in model classes. Active Model also helps with building custom ORMs.
 
-
 ## Usage
 
 Please also checkout the [detailed guide](https://spider-gazelle.net/#/models/basics).
-
 
 ### Active Model
 
@@ -33,10 +31,27 @@ p.attributes # => {:name => "Bob Jane", :age => 32}
 
 The `attribute` macro takes two parameters. The field name with type and an optional default value.
 
+#### `enum_attibutes`
+
+Allows type safe enum defined attributes.<br>
+Same signature as `attribute` with an extra optional parameter to specify the serialisation of the enum member to either String or Int32, default is Int32.
+
+```ruby
+require "active-model"
+
+class Order < ActiveModel::Model
+  enum Product
+   Fries
+   Burger
+  end
+
+  enum_attribute product : Product = Product::Fries
+end
+```
 
 #### Validations
 
-ActiveModel::Validators is a mix-in that you include in your class. Similar to those supported by Rails: http://guides.rubyonrails.org/active_record_validations.html
+ActiveModel::Validators is a mix-in that you include in your class. Similar to those supported by Rails: <http://guides.rubyonrails.org/active_record_validations.html>
 
 ```crystal
 require "active-model"
@@ -52,13 +67,9 @@ class Person < ActiveModel::Model
 end
 ```
 
-The `validate` macro takes three parameters.  The symbol of the field and the message that will
-display when the validation fails.  The third is a `Proc` that is provided an
-instance of `self` and returns either true or false.
+The `validate` macro takes three parameters. The symbol of the field and the message that will display when the validation fails. The third is a `Proc` that is provided an instance of `self` and returns either true or false.
 
-To check to see if your instance is valid, call `valid?`.  Each Proc will be
-called and if any of them fails, an `errors` Array with the messages is
-returned.
+To check to see if your instance is valid, call `valid?`. Each Proc will be called and if any of them fails, an `errors` Array with the messages is returned.
 
 If no Symbol is provided as a first parameter, the errors will be added to the `:base` field.
 
@@ -68,13 +79,11 @@ person.valid?.should eq false
 person.errors[0].to_s.should eq "Name is too short"
 ```
 
-
 #### Dirty Checking
 
-Changes to attributes are tracked throughout the lifetime of the model. Similar to Rails: http://api.rubyonrails.org/classes/ActiveModel/Dirty.html
+Changes to attributes are tracked throughout the lifetime of the model. Similar to Rails: <http://api.rubyonrails.org/classes/ActiveModel/Dirty.html>
 
 ```crystal
-
 person = Person.new(name: "JD")
 person.changed? # => true
 person.changed_attributes # => {:name => "JD"}
@@ -88,8 +97,7 @@ person.changed? # => false
 
 #### Callbacks
 
-Register before/after callbacks for `create`, `update`, `delete`, `save` methods.
-You must define the method you wish to register callbacks for.  
+Register before/after callbacks for `create`, `update`, `delete`, `save` methods. You must define the method you wish to register callbacks for.<br>
 Registered callbacks are invoked through wrapping crud logic with the `run_create_callbacks`, `run_update_callbacks`, etc. functions
 
 ```crystal
