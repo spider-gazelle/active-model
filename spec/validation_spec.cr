@@ -51,6 +51,15 @@ class Person < ORM
   })
 end
 
+class CustomError < ORM
+  attribute temperature : Int32 = 100, custom_tag: "whawhat"
+
+  validate ->(this : CustomError) {
+    temp = this.temperature
+    validation_error(:temperature, "I like my coffee heat divisible by 3") unless temp && temp % 3 == 0
+  }
+end
+
 describe ActiveModel::Validation do
   describe "presence" do
     it "validates presence of name" do
@@ -186,6 +195,13 @@ describe ActiveModel::Validation do
       person = Person.new(name: "JD")
       person.valid?.should eq false
       person.errors[0].to_s.should eq "Name must be 3 characters long"
+    end
+  end
+
+  describe "custom errors" do
+    it "allows definition of custom validation error" do
+      model = CustomError.new
+      model.valid?.should be_false
     end
   end
 end
