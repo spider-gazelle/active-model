@@ -312,7 +312,7 @@ abstract class ActiveModel::Model
   end
 
   # Allow enum attributes. Persisted as either String | Int32
-  macro enum_attribute(name, column_type = Int32, mass_assignment = true, persistence = true)
+  macro enum_attribute(name, column_type = Int32, mass_assignment = true, persistence = true, **tags)
     {% enum_type = name.type %}
 
     # Define a column name for the serialized enum value
@@ -325,13 +325,13 @@ abstract class ActiveModel::Model
     # Default enum value serialization
     {% if name.value %}
       {% if column_type.stringify == "String" %}
-        attribute {{ column_name }} : String = {{ name.value }}.to_s
+        attribute {{ column_name }} : String = {{ name.value }}.to_s, mass_assignment: {{mass_assignment}}, persistence: {{persistence}}{% if !tags.empty? %}, tags: {{tags}} {% end %}
       {% elsif column_type.stringify == "Int32" %}
-        attribute {{ column_name }} : Int32 = {{ name.value }}.to_i
+        attribute {{ column_name }} : Int32 = {{ name.value }}.to_i, mass_assignment: {{mass_assignment}}, persistence: {{persistence}}{% if !tags.empty? %}, tags: {{tags}} {% end %}
       {% end %}
     {% else %}
         # No default
-        attribute {{ column_name }} : {{ column_type.id }}
+        attribute {{ column_name }} : {{ column_type.id }}, mass_assignment: {{mass_assignment}}, persistence: {{persistence}}{% if !tags.empty? %}, tags: {{tags}} {% end %}
     {% end %}
 
     {%
@@ -343,7 +343,7 @@ abstract class ActiveModel::Model
     %}
   end
 
-  macro attribute(name, converter = nil, mass_assignment = true, persistence = true)
+  macro attribute(name, converter = nil, mass_assignment = true, persistence = true, **tags)
     # Attribute default value
     def {{name.var}}_default : {{name.type}} | Nil
       {% if name.value %}
@@ -353,13 +353,13 @@ abstract class ActiveModel::Model
       {% end %}
     end
 
-
     {%
       LOCAL_FIELDS[name.var] = {
         klass:          name.type,
         converter:      converter,
         mass_assign:    mass_assignment,
         should_persist: persistence,
+        tags: tags,
       }
     %}
     {%
@@ -368,6 +368,7 @@ abstract class ActiveModel::Model
         converter:      converter,
         mass_assign:    mass_assignment,
         should_persist: persistence,
+        tags: tags,
       }
     %}
     {% HAS_KEYS[0] = true %}

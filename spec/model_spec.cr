@@ -44,7 +44,7 @@ class EnumAttributes < ActiveModel::Model
     Fries
   end
 
-  enum_attribute size : Size, column_type: Int32
+  enum_attribute size : Size, column_type: Int32, custom_tag: "what what"
   enum_attribute product : Product = Product::Fries
 end
 
