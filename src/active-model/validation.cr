@@ -3,10 +3,15 @@ require "./error"
 module ActiveModel::Validation
   property errors = [] of Error
 
+  macro validation_error(field, message)
+    this.errors << ActiveModel::Error.new(this, {{ field }}, {{ message }})
+  end
+
   macro included
     AM_PARENT_TYPE = {} of Nil => Nil
     __set_amv_type__
     @@validators = Array({field: Symbol, message: String, positive: (Proc(self, Bool) | Nil), negative: (Proc(self, Bool) | Nil), block: Proc(self, Bool)}).new
+
   end
 
   macro __set_amv_type__

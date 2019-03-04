@@ -70,6 +70,9 @@ abstract class ActiveModel::Model
         {% for name, index in FIELDS.keys %}
           :{{name.id}},
         {% end %}
+        {% for name, index in ENUM_FIELDS.keys %}
+          :{{name.id}},
+        {% end %}
       ] {% if !HAS_KEYS[0] %} of Nil {% end %}
     end
 
