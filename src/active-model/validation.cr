@@ -3,15 +3,14 @@ require "./error"
 module ActiveModel::Validation
   property errors = [] of Error
 
-  macro validation_error(field, message)
-    this.errors << ActiveModel::Error.new(this, {{ field }}, {{ message }})
-  end
-
   macro included
     AM_PARENT_TYPE = {} of Nil => Nil
     __set_amv_type__
     @@validators = Array({field: Symbol, message: String, positive: (Proc(self, Bool) | Nil), negative: (Proc(self, Bool) | Nil), block: Proc(self, Bool)}).new
+  end
 
+  macro validation_error(field, message)
+    this.errors << ActiveModel::Error.new(this, {{ field }}, {{ message }})
   end
 
   macro __set_amv_type__
@@ -24,30 +23,38 @@ module ActiveModel::Validation
 
     {% if pos %}
       {% if pos.stringify.starts_with? ":" %}
-        pos_proc = ->(this : {{AM_PARENT_TYPE[:type]}}) { !!this.as({{@type.name}}).{{positive.id}} }
+        %pos_proc = ->(this : {{AM_PARENT_TYPE[:type]}}) { !!this.as({{@type.name}}).{{positive.id}} }
       {% else %}
-        pos_proc = ->(this : {{AM_PARENT_TYPE[:type]}}) { !!{{positive}}.call(this.as({{@type.name}})) }
+        %pos_proc = ->(this : {{AM_PARENT_TYPE[:type]}}) { !!{{positive}}.call(this.as({{@type.name}})) }
       {% end %}
     {% else %}
-      pos_proc = nil
+      %pos_proc = nil
     {% end %}
 
     {% if neg %}
       {% if neg.stringify.starts_with? ":" %}
-        neg_proc = ->(this : {{AM_PARENT_TYPE[:type]}}) { !!this.as({{@type.name}}).{{negative.id}} }
+        %neg_proc = ->(this : {{AM_PARENT_TYPE[:type]}}) { !!this.as({{@type.name}}).{{negative.id}} }
       {% else %}
-        neg_proc = ->(this : {{AM_PARENT_TYPE[:type]}}) { !!{{negative}}.call(this.as({{@type.name}})) }
+        %neg_proc = ->(this : {{AM_PARENT_TYPE[:type]}}) { !!{{negative}}.call(this.as({{@type.name}})) }
       {% end %}
     {% else %}
-      neg_proc = nil
+      %neg_proc = nil
     {% end %}
 
-    wrapper_block = ->(this : {{AM_PARENT_TYPE[:type]}}) { {{block}}.call(this.as({{@type.name}})) }
-    @@validators << {field: {{field}}, message: {{message}}, positive: pos_proc, negative: neg_proc, block: wrapper_block}
+    %wrapper_block = ->(this : {{AM_PARENT_TYPE[:type]}}) { {{block}}.call(this.as({{@type.name}})) }
+    @@validators << {field: {{field}}, message: {{message}}, positive: %pos_proc, negative: %neg_proc, block: %wrapper_block}
   end
 
   macro validate(message, block, **options)
     validate :__base__, {{message}}, {{block}}, {{options[:if]}}, {{options[:unless]}}
+  end
+
+  macro validate(block, **options)
+    %proc = ->(this : {{AM_PARENT_TYPE[:type]}}) {
+      {{block}}.call(this.as({{@type.name}}))
+      false
+    }
+    validate :ignore, "", %proc, {{options[:if]}}, {{options[:unless]}}
   end
 
   macro __numericality__(allow_nil, fields, num, message, operation, positive, negative)

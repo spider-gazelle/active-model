@@ -52,13 +52,12 @@ class Person < ORM
 end
 
 class CustomError < ORM
-  attribute temperature : Int32 = 100
+  attribute temperature : Int32 = 100, custom_tag: "whawhat"
 
-  validate("I'm very specific about my coffee", ->(this : CustomError) {
+  validate ->(this : CustomError) {
     temp = this.temperature
     validation_error(:temperature, "I like my coffee heat divisible by 3") unless temp && temp % 3 == 0
-    !!(temp && temp == 42)
-  })
+  }
 end
 
 describe ActiveModel::Validation do
