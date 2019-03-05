@@ -314,12 +314,13 @@ abstract class ActiveModel::Model
   # Allow enum attributes. Persisted as either String | Int32
   macro enum_attribute(name, column_type = Int32, mass_assignment = true, persistence = true, **tags)
     {% enum_type = name.type %}
+    {% normalized_enum_name = "_" + enum_type.stringify.gsub(/::/, "_").underscore.downcase %}
 
     # Define a column name for the serialized enum value
     {% if column_type.stringify == "String" %}
-    {% column_name = ("_" + enum_type.stringify.downcase + "_str").id %}
+    {% column_name = (normalized_enum_name + "_str").id %}
     {% elsif column_type.stringify == "Int32" %}
-    {% column_name = ("_" + enum_type.stringify.downcase + "_int").id %}
+    {% column_name = (normalized_enum_name + "_int").id %}
     {% end %}
 
     # Default enum value serialization
@@ -359,7 +360,7 @@ abstract class ActiveModel::Model
         converter:      converter,
         mass_assign:    mass_assignment,
         should_persist: persistence,
-        tags: tags,
+        tags:           tags,
       }
     %}
     {%
@@ -368,7 +369,7 @@ abstract class ActiveModel::Model
         converter:      converter,
         mass_assign:    mass_assignment,
         should_persist: persistence,
-        tags: tags,
+        tags:           tags,
       }
     %}
     {% HAS_KEYS[0] = true %}
