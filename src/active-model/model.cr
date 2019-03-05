@@ -92,9 +92,18 @@ abstract class ActiveModel::Model
         {% column_type = ENUM_FIELDS[name][:column_type].id %}
         {% column_name = ENUM_FIELDS[name][:column_name].id %}
 
+        def {{ name }}_changed
+          @{{ column_name }}_changed
+        end
+
+
         {% if column_type.stringify == "String" %}
           def {{name}} : {{enum_type}}
             @{{name}} ||= {{enum_type}}.parse(@{{column_name}}.to_s)
+          end
+
+          def {{ name }}_was
+            @{{ name }}_was ||= {{enum_type}}.parse?(@{{column_name}}_was.to_s)
           end
 
           def {{name}}=(val : {{enum_type}})
@@ -105,6 +114,10 @@ abstract class ActiveModel::Model
         {% elsif column_type.stringify == "Int32" %}
           def {{name}} : {{enum_type}}
             @{{name}} ||= {{enum_type}}.new(@{{column_name}}.not_nil!.to_i32)
+          end
+
+          def {{ name }}_was
+            @{{ name }}_was ||= {{enum_type}}.parse?(@{{column_name}}_was.try(&.to_i32))
           end
 
           def {{name}}=(val : {{enum_type}})
