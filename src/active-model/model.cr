@@ -349,7 +349,7 @@ abstract class ActiveModel::Model
     {% end %}
 
     {%
-      ENUM_FIELDS[name.var] = {
+      ENUM_FIELDS[name.var.id] = {
         enum_type:   enum_type.id,
         column_type: column_type.id,
         column_name: column_name.id,
@@ -367,8 +367,12 @@ abstract class ActiveModel::Model
       {% end %}
     end
 
+
+    {% if tags.empty? == true %}
+      {% tags = nil %}
+    {% end %}
     {%
-      LOCAL_FIELDS[name.var] = {
+      LOCAL_FIELDS[name.var.id] = {
         klass:          name.type,
         converter:      converter,
         mass_assign:    mass_assignment,
@@ -377,7 +381,7 @@ abstract class ActiveModel::Model
       }
     %}
     {%
-      FIELDS[name.var] = {
+      FIELDS[name.var.id] = {
         klass:          name.type,
         converter:      converter,
         mass_assign:    mass_assignment,
@@ -387,7 +391,7 @@ abstract class ActiveModel::Model
     %}
     {% HAS_KEYS[0] = true %}
     {% if name.value %}
-      {% DEFAULTS[name.var] = name.value %}
+      {% DEFAULTS[name.var.id] = name.value %}
     {% end %}
   end
 end
