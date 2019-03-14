@@ -28,12 +28,12 @@ abstract class ActiveModel::Model
   def apply_defaults; end
 
   macro __process_attributes__
-    {% FIELD_MAPPINGS[@type.name.id] = LOCAL_FIELDS %}
+    {% FIELD_MAPPINGS[@type] = LOCAL_FIELDS %}
     {% klasses = @type.ancestors %}
 
     # Create a mapping of all field names and types
     {% for name, index in klasses %}
-      {% fields = FIELD_MAPPINGS[name.id] %}
+      {% fields = FIELD_MAPPINGS[name] %}
 
       {% if fields && !fields.empty? %}
         {% for name, opts in fields %}
