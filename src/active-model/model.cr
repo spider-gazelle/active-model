@@ -15,12 +15,14 @@ abstract class ActiveModel::Model
 
     # Process attributes must be called while constants are in scope
     macro finished
+      {% unless @type.abstract? %}
       __process_attributes__
       __customize_orm__
       __track_changes__
       __map_json__
       __create_initializer__
       __create_assign_attributes__
+      {% end %}
     end
   end
 
