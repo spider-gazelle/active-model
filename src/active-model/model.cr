@@ -12,7 +12,6 @@ abstract class ActiveModel::Model
     FIELDS = {} of Nil => Nil
     ENUM_FIELDS = {} of Nil => Nil
 
-
     # Process attributes must be called while constants are in scope
     macro finished
       __process_attributes__
@@ -21,13 +20,20 @@ abstract class ActiveModel::Model
       __track_changes__
       __map_json__
       __create_initializer__
-      __create_assign_attributes__
       {% end %}
     end
   end
 
-  # Prevent compiler errors
+  # Stub methods to prevent compiler errors
   def apply_defaults; end
+
+  def self.from_trusted_json; end
+
+  def changed?; end
+
+  def clear_changes_information; end
+
+  def changed_attributes; end
 
   macro __process_attributes__
     {% FIELD_MAPPINGS[@type] = LOCAL_FIELDS %}
@@ -127,6 +133,63 @@ abstract class ActiveModel::Model
             @{{column_name}} = val.value
           end
         {% end %}
+    {% end %}
+
+    def assign_attributes(
+      {% for name, opts in FIELDS %}
+        {{name}} : {{opts[:klass]}} | Nil = nil,
+      {% end %}
+    )
+      {% for name, opts in FIELDS %}
+        {% if opts[:mass_assign] %}
+          self.{{name}} = {{name}} unless {{ name }}.nil?
+        {% end %}
+      {% end %}
+    end
+
+    # Accept HTTP params
+    def assign_attributes(params : HTTP::Params | Hash(String, String) | Tuple(String, String))
+      __from_object_params__(params)
+    end
+  end
+
+  macro __from_object_params__(params)
+    {% for name, opts in FIELDS %}
+      {% if opts[:mass_assign] %}
+        value = {{ params.id }}[{{name.stringify}}]?
+        if value
+          {% coerce = opts[:klass].stringify %}
+          {% if coerce == "String" %}
+            self.{{name}} = value
+          {% elsif coerce == "Int8" %}
+            self.{{name}} = value.to_i8
+          {% elsif coerce == "Int16" %}
+            self.{{name}} = value.to_i16
+          {% elsif coerce == "Int32" %}
+            self.{{name}} = value.to_i32
+          {% elsif coerce == "Int64" %}
+            self.{{name}} = value.to_i64
+          {% elsif coerce == "UInt8" %}
+            self.{{name}} = value.to_u8
+          {% elsif coerce == "UInt16" %}
+            self.{{name}} = value.to_u16
+          {% elsif coerce == "UInt32" %}
+            self.{{name}} = value.to_u32
+          {% elsif coerce == "UInt64" %}
+            self.{{name}} = value.to_u64
+          {% elsif coerce == "BigDecimal" %}
+            self.{{name}} = value.to_big_d
+          {% elsif coerce == "BigInt" %}
+            self.{{name}} = value.to_big_i
+          {% elsif coerce == "Float32" %}
+            self.{{name}} = value.to_f32
+          {% elsif coerce == "Float64" %}
+            self.{{name}} = value.to_f64
+          {% elsif coerce == "Bool" %}
+            self.{{name}} = value[0].downcase == 't'
+          {% end %}
+        end
+      {% end %}
     {% end %}
   end
 
@@ -267,65 +330,6 @@ abstract class ActiveModel::Model
     {% end %}
   end
 
-  macro __create_assign_attributes__
-    def assign_attributes(
-      {% for name, opts in FIELDS %}
-        {{name}} : {{opts[:klass]}} | Nil = nil,
-      {% end %}
-    )
-      {% for name, opts in FIELDS %}
-        {% if opts[:mass_assign] %}
-          self.{{name}} = {{name}} unless {{ name }}.nil?
-        {% end %}
-      {% end %}
-    end
-
-    # Accept HTTP params
-    def assign_attributes(params : HTTP::Params | Hash(String, String) | Tuple(String, String))
-      __from_object_params__(params)
-    end
-  end
-
-  macro __from_object_params__(params)
-    {% for name, opts in FIELDS %}
-      {% if opts[:mass_assign] %}
-        value = {{ params.id }}[{{name.stringify}}]?
-        if value
-          {% coerce = opts[:klass].stringify %}
-          {% if coerce == "String" %}
-            self.{{name}} = value
-          {% elsif coerce == "Int8" %}
-            self.{{name}} = value.to_i8
-          {% elsif coerce == "Int16" %}
-            self.{{name}} = value.to_i16
-          {% elsif coerce == "Int32" %}
-            self.{{name}} = value.to_i32
-          {% elsif coerce == "Int64" %}
-            self.{{name}} = value.to_i64
-          {% elsif coerce == "UInt8" %}
-            self.{{name}} = value.to_u8
-          {% elsif coerce == "UInt16" %}
-            self.{{name}} = value.to_u16
-          {% elsif coerce == "UInt32" %}
-            self.{{name}} = value.to_u32
-          {% elsif coerce == "UInt64" %}
-            self.{{name}} = value.to_u64
-          {% elsif coerce == "BigDecimal" %}
-            self.{{name}} = value.to_big_d
-          {% elsif coerce == "BigInt" %}
-            self.{{name}} = value.to_big_i
-          {% elsif coerce == "Float32" %}
-            self.{{name}} = value.to_f32
-          {% elsif coerce == "Float64" %}
-            self.{{name}} = value.to_f64
-          {% elsif coerce == "Bool" %}
-            self.{{name}} = value[0].downcase == 't'
-          {% end %}
-        end
-      {% end %}
-    {% end %}
-  end
-
   # Allow enum attributes. Persisted as either String | Int32
   macro enum_attribute(name, column_type = Int32, mass_assignment = true, persistence = true, **tags)
     {% enum_type = name.type %}
@@ -368,7 +372,6 @@ abstract class ActiveModel::Model
         nil
       {% end %}
     end
-
 
     {% if tags.empty? == true %}
       {% tags = nil %}

@@ -1,11 +1,14 @@
 require "./spec_helper"
 
+abstract class Abstract < ActiveModel::Model
+end
+
 # This should not cause compilation errors
-class NoAttributes < ActiveModel::Model
+class NoAttributes < Abstract
 end
 
 # Inheritance should be supported
-class BaseKlass < NoAttributes
+class BaseKlass < Abstract
   attribute string : String = ->{ "hello" }
   attribute integer : Int32 = 45
   attribute no_default : String
