@@ -27,7 +27,9 @@ abstract class ActiveModel::Model
   # Stub methods to prevent compiler errors
   def apply_defaults; end
 
-  def self.from_trusted_json; end
+  def self.from_trusted_json(json : IO); end
+
+  def self.from_trusted_json(json : String); end
 
   def changed?; end
 
