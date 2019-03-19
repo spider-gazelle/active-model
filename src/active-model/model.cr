@@ -371,6 +371,7 @@ abstract class ActiveModel::Model
   end
 
   macro attribute(name, converter = nil, mass_assignment = true, persistence = true, **tags)
+    @{{name.var}} : {{name.type}} | Nil
     # Attribute default value
     def {{name.var}}_default : {{name.type}} | Nil
       {% if name.value %}
