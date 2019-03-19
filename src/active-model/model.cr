@@ -38,19 +38,24 @@ abstract class ActiveModel::Model
   def changed_attributes; end
 
   macro __process_attributes__
-    {% FIELD_MAPPINGS[@type] = LOCAL_FIELDS %}
     {% klasses = @type.ancestors %}
+    {% FIELD_MAPPINGS[@type] = {} of Nil => Nil %}
 
     # Create a mapping of all field names and types
     {% for name, index in klasses %}
       {% fields = FIELD_MAPPINGS[name] %}
-
       {% if fields && !fields.empty? %}
         {% for name, opts in fields %}
           {% FIELDS[name] = opts %}
+          {% FIELD_MAPPINGS[@type][name] = opts %}
           {% HAS_KEYS[0] = true %}
         {% end %}
       {% end %}
+    {% end %}
+
+    # Apply local fields on top of ancestors
+    {% for name, opts in LOCAL_FIELDS %}
+      {% FIELD_MAPPINGS[@type][name] = opts %}
     {% end %}
 
     # Generate code to apply default values
