@@ -5,7 +5,6 @@ module ActiveModel::Callbacks
     macro inherited
       CALLBACKS = {
         {% for name in CALLBACK_NAMES %}
-          # {{name.id}}: [] of (Block | String),
           {{name.id}}: [] of Nil,
         {% end %}
       }

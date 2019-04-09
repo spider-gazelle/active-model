@@ -56,7 +56,7 @@ class CustomError < ORM
 
   validate ->(this : CustomError) {
     temp = this.temperature
-    validation_error(:temperature, "I like my coffee heat divisible by 3") unless temp && temp % 3 == 0
+    this.validation_error(:temperature, "is important, it must be divisible by 3") unless temp && temp % 3 == 0
   }
 end
 
@@ -202,6 +202,7 @@ describe ActiveModel::Validation do
     it "allows definition of custom validation error" do
       model = CustomError.new
       model.valid?.should be_false
+      model.errors[0].to_s.should eq "Temperature is important, it must be divisible by 3"
     end
   end
 end
