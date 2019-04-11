@@ -203,6 +203,7 @@ describe ActiveModel::Validation do
       model = CustomError.new
       model.valid?.should be_false
       model.errors[0].to_s.should eq "Temperature is important, it must be divisible by 3"
+      model.errors.size.should eq 1
     end
   end
 end

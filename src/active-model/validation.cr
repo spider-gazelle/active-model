@@ -53,7 +53,7 @@ module ActiveModel::Validation
   macro validate(block, **options)
     %proc = ->(this : {{AM_PARENT_TYPE[:type]}}) {
       {{block}}.call(this.as({{@type.name}}))
-      false
+      true
     }
     validate :ignore, "", %proc, {{options[:if]}}, {{options[:unless]}}
   end
