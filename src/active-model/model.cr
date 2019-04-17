@@ -110,9 +110,7 @@ abstract class ActiveModel::Model
     def persistent_attributes
       {
         {% for name, opts in PERSIST %}
-          {% if opts[:should_persist] %}
           :{{name}} => @{{name}},
-          {% end %}
         {% end %}
       } {% if PERSIST.empty? %} of Nil => Nil {% end %}
     end
