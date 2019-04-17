@@ -350,24 +350,43 @@ describe ActiveModel::Model do
       opts.bob.should eq "Steve"
     end
 
-    it "should allow non-persisted values" do
-      time = Time.unix 420420420
-      bob = "sick"
-      feeling = "ill"
-      weird = "object"
+    describe "persistence" do
+      it "should allow non-persisted attributes" do
+        time = Time.utc_now
+        bob = "sick"
+        feeling = "ill"
+        weird = "object"
 
-      opts = AttributeOptions.new(time: time, bob: bob, feeling: feeling, weird: weird)
-      opts.persistent_attributes.should eq ({
-        :time  => time,
-        :bob   => bob,
-        :weird => weird,
-      })
-      opts.attributes.should eq ({
-        :time    => time,
-        :bob     => bob,
-        :weird   => weird,
-        :feeling => feeling,
-      })
+        model = AttributeOptions.new(time: time, bob: bob, feeling: feeling, weird: weird)
+        model.persistent_attributes.should eq ({
+          :time  => time,
+          :bob   => bob,
+          :weird => weird,
+        })
+        model.attributes.should eq ({
+          :time    => time,
+          :bob     => bob,
+          :weird   => weird,
+          :feeling => feeling,
+        })
+      end
+
+      it "should prevent json serialisation of non-persisted attributes" do
+        time = Time.utc_now
+        bob = "lob"
+        feeling = "free"
+        weird = "sauce"
+
+        model = AttributeOptions.new(time: time, bob: bob, feeling: feeling, weird: weird)
+        json = model.to_json
+
+        # Should not serialize the non-persisted field
+        JSON.parse(json)["feeling"]?.should be_nil
+
+        # From json ignores the field
+        deserialised_model = AttributeOptions.from_trusted_json(json)
+        deserialised_model.feeling.should be_nil
+      end
     end
   end
 end
