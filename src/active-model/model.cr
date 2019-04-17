@@ -11,6 +11,7 @@ abstract class ActiveModel::Model
     HAS_KEYS = [false]
     FIELDS = {} of Nil => Nil
     ENUM_FIELDS = {} of Nil => Nil
+    PERSIST = {} of Nil => Nil
 
     # Process attributes must be called while constants are in scope
     macro finished
@@ -58,6 +59,20 @@ abstract class ActiveModel::Model
       {% FIELD_MAPPINGS[@type][name] = opts %}
     {% end %}
 
+    # Persisted fields
+    {% for name, opts in FIELDS %}
+      {% if opts[:should_persist] %}
+        {% PERSIST[name] = opts %}
+      {% end %}
+    {% end %}
+
+    # Accessors for attributes without JSON mapping
+    {% for name, opts in FIELDS %}
+      {% unless opts[:should_persist] %}
+        property {{ name }}
+      {% end %}
+    {% end %}
+
     # Generate code to apply default values
     def apply_defaults
       super
@@ -94,12 +109,12 @@ abstract class ActiveModel::Model
     # Returns a hash of all attributes that may be persisted
     def persistent_attributes
       {
-        {% for name, index in FIELDS.keys %}
-          {% if FIELDS[name][:should_persist] %}
+        {% for name, opts in PERSIST %}
+          {% if opts[:should_persist] %}
           :{{name}} => @{{name}},
           {% end %}
         {% end %}
-      } {% if !HAS_KEYS[0] %} of Nil => Nil {% end %}
+      } {% if PERSIST.empty? %} of Nil => Nil {% end %}
     end
 
     {% for name, index in ENUM_FIELDS.keys %}
@@ -308,9 +323,9 @@ abstract class ActiveModel::Model
 
   # Adds the from_json method
   macro __map_json__
-    {% if HAS_KEYS[0] %}
+    {% if HAS_KEYS[0] && !PERSIST.empty? %}
       JSON.mapping(
-        {% for name, opts in FIELDS %}
+        {% for name, opts in PERSIST %}
           {% if opts[:converter] %}
             {{name}}: { type: {{opts[:klass]}} | Nil, converter: {{opts[:converter]}} },
           {% else %}
