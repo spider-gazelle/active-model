@@ -342,6 +342,7 @@ abstract class ActiveModel::Model
           {% end %}
         end
         apply_defaults
+        clear_changes_information
       end
 
       def self.from_trusted_json(json)
