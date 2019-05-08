@@ -1,4 +1,5 @@
 require "json"
+require "yaml"
 require "http/params"
 
 abstract class ActiveModel::Model
@@ -28,9 +29,9 @@ abstract class ActiveModel::Model
   # Stub methods to prevent compiler errors
   def apply_defaults; end
 
-  def self.from_trusted_json(json : IO); end
+  def self.from_trusted_json(json : IO | String); end
 
-  def self.from_trusted_json(json : String); end
+  def self.from_trusted_yaml(yaml : IO | String); end
 
   def changed?; end
 
@@ -347,6 +348,45 @@ abstract class ActiveModel::Model
 
       def self.from_trusted_json(json)
         {{@type.name.id}}.new(::JSON::PullParser.new(json), true)
+      end
+
+      YAML.mapping(
+        {% for name, opts in PERSIST %}
+          {% if opts[:converter] %}
+            {{name}}: { type: {{opts[:klass]}} | Nil, converter: {{opts[:converter]}} },
+          {% else %}
+            {{name}}: {{opts[:klass]}} | Nil,
+          {% end %}
+        {% end %}
+      )
+
+      def initialize(%yaml : YAML::ParseContext, %node : ::YAML::Nodes::Node, _dummy : Nil, trusted = false)
+        previous_def(%yaml, %node, nil)
+        if !trusted
+          {% for name, opts in FIELDS %}
+            {% if !opts[:mass_assign] %}
+              @{{name}} = nil
+            {% end %}
+          {% end %}
+        end
+        apply_defaults
+        clear_changes_information
+      end
+
+      def self.from_trusted_yaml(string_or_io : String | IO) : self
+        ctx = YAML::ParseContext.new
+        node = begin
+          document = YAML::Nodes.parse(string_or_io)
+
+          # If the document is empty we simulate an empty scalar with
+          # plain style, that parses to Nil
+          document.nodes.first? || begin
+            scalar = YAML::Nodes::Scalar.new("")
+            scalar.style = YAML::ScalarStyle::PLAIN
+            scalar
+          end
+        end
+        {{@type.name.id}}.new(ctx, node, nil, true)
       end
     {% end %}
   end
