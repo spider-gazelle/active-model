@@ -404,7 +404,7 @@ abstract class ActiveModel::Model
         model = self.class.from_trusted_yaml(yaml)
         data = YAML.parse(yaml)
         {% for name, opts in FIELDS %}
-          self.{{name}} = model.{{name}}
+          self.{{name}} = model.{{name}} if data[{{name.stringify}}]?
         {% end %}
       end
     {% end %}
