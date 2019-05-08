@@ -353,6 +353,30 @@ describe ActiveModel::Model do
       opts.changed_attributes.should eq({} of Nil => Nil)
     end
 
+    it "should not assign updated attributes protected from json mass assignment" do
+      opts = AttributeOptions.from_json(%({"time": 1459859781, "bob": "Steve"}))
+      opts.time.should eq Time.unix(1459859781)
+      opts.bob.should eq "Bobby"
+
+      opts.assign_attributes_from(%({"time": 1459859782, "bob": "Steve"}))
+      opts.time.should eq Time.unix(1459859782)
+      opts.bob.should eq "Bobby"
+
+      opts.changed_attributes.should eq({:time => Time.unix(1459859782)})
+    end
+
+    it "should assign updated attributes protected from json mass assignment where data source is trusted" do
+      opts = AttributeOptions.from_trusted_json(%({"time": 1459859781, "bob": "Steve"}))
+      opts.time.should eq Time.unix(1459859781)
+      opts.bob.should eq "Steve"
+
+      opts.assign_attributes_from_trusted(%({"time": 1459859782, "bob": "James"}))
+      opts.time.should eq Time.unix(1459859782)
+      opts.bob.should eq "James"
+
+      opts.changed_attributes.should eq({:time => Time.unix(1459859782), :bob => "James"})
+    end
+
     it "should convert values using yaml converters" do
       AttributeOptions.attributes.should eq [:time, :bob, :feeling, :weird]
       opts = AttributeOptions.from_yaml(%({"time": 1459859781, "bob": "Angus", "weird": 34}))
@@ -373,6 +397,30 @@ describe ActiveModel::Model do
       opts.time.should eq Time.unix(1459859781)
       opts.bob.should eq "Steve"
       opts.changed_attributes.should eq({} of Nil => Nil)
+    end
+
+    it "should not assign updated attributes protected from yaml mass assignment" do
+      opts = AttributeOptions.from_yaml(%({"time": 1459859781, "bob": "Steve"}))
+      opts.time.should eq Time.unix(1459859781)
+      opts.bob.should eq "Bobby"
+
+      opts.assign_attributes_from(%({"time": 1459859782, "bob": "Steve"}))
+      opts.time.should eq Time.unix(1459859782)
+      opts.bob.should eq "Bobby"
+
+      opts.changed_attributes.should eq({:time => Time.unix(1459859782)})
+    end
+
+    it "should assign updated attributes protected from yaml mass assignment where data source is trusted" do
+      opts = AttributeOptions.from_trusted_yaml(%({"time": 1459859781, "bob": "Steve"}))
+      opts.time.should eq Time.unix(1459859781)
+      opts.bob.should eq "Steve"
+
+      opts.assign_attributes_from_trusted(%({"time": 1459859782, "bob": "James"}))
+      opts.time.should eq Time.unix(1459859782)
+      opts.bob.should eq "James"
+
+      opts.changed_attributes.should eq({:time => Time.unix(1459859782), :bob => "James"})
     end
 
     describe "persistence" do
