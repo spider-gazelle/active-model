@@ -407,8 +407,26 @@ abstract class ActiveModel::Model
         {{@type.name.id}}.new(ctx, node, nil, true)
       end
 
+      def assign_attributes_from_json(json)
+        model = self.class.from_json(json)
+        data = JSON.parse(json)
+        {% for name, opts in FIELDS %}
+          {% if opts[:mass_assign] %}
+            self.{{name}} = model.{{name}} if data[{{name.stringify}}]?
+          {% end %}
+        {% end %}
+      end
+
+      def assign_attributes_from_trusted_json(json)
+        model = self.class.from_trusted_json(json)
+        data = JSON.parse(json)
+        {% for name, opts in FIELDS %}
+          self.{{name}} = model.{{name}} if data[{{name.stringify}}]?
+        {% end %}
+      end
+
       # Uses the YAML parser as JSON is valid YAML
-      def assign_attributes_from(yaml)
+      def assign_attributes_from_yaml(yaml)
         model = self.class.from_yaml(yaml)
         data = YAML.parse(yaml)
         {% for name, opts in FIELDS %}
@@ -418,7 +436,7 @@ abstract class ActiveModel::Model
         {% end %}
       end
 
-      def assign_attributes_from_trusted(yaml)
+      def assign_attributes_from_trusted_yaml(yaml)
         model = self.class.from_trusted_yaml(yaml)
         data = YAML.parse(yaml)
         {% for name, opts in FIELDS %}

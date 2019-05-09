@@ -371,7 +371,7 @@ describe ActiveModel::Model do
       opts.time.should eq Time.unix(1459859781)
       opts.bob.should eq "Bobby"
 
-      opts.assign_attributes_from(%({"time": 1459859782, "bob": "Steve"}))
+      opts.assign_attributes_from_json(%({"time": 1459859782, "bob": "Steve"}))
       opts.time.should eq Time.unix(1459859782)
       opts.bob.should eq "Bobby"
 
@@ -383,7 +383,7 @@ describe ActiveModel::Model do
       opts.time.should eq Time.unix(1459859781)
       opts.bob.should eq "Steve"
 
-      opts.assign_attributes_from_trusted(%({"time": 1459859782, "bob": "James"}))
+      opts.assign_attributes_from_trusted_json(%({"time": 1459859782, "bob": "James"}))
       opts.time.should eq Time.unix(1459859782)
       opts.bob.should eq "James"
 
@@ -417,7 +417,7 @@ describe ActiveModel::Model do
       opts.time.should eq Time.unix(1459859781)
       opts.bob.should eq "Bobby"
 
-      opts.assign_attributes_from(%({"time": 1459859782, "bob": "Steve"}))
+      opts.assign_attributes_from_yaml(%({"time": 1459859782, "bob": "Steve"}))
       opts.time.should eq Time.unix(1459859782)
       opts.bob.should eq "Bobby"
 
@@ -429,7 +429,7 @@ describe ActiveModel::Model do
       opts.time.should eq Time.unix(1459859781)
       opts.bob.should eq "Steve"
 
-      opts.assign_attributes_from_trusted(%({"time": 1459859782, "bob": "James"}))
+      opts.assign_attributes_from_trusted_yaml(%({"time": 1459859782, "bob": "James"}))
       opts.time.should eq Time.unix(1459859782)
       opts.bob.should eq "James"
 
