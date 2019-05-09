@@ -121,10 +121,9 @@ abstract class ActiveModel::Model
         {% column_type = ENUM_FIELDS[name][:column_type].id %}
         {% column_name = ENUM_FIELDS[name][:column_name].id %}
 
-        def {{ name }}_changed
-          @{{ column_name }}_changed
+        def {{ name }}_changed?
+          !!@{{column_name}}_changed
         end
-
 
         {% if column_type.stringify == "String" %}
           def {{name}} : {{enum_type}}
