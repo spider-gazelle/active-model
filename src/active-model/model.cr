@@ -141,12 +141,13 @@ abstract class ActiveModel::Model
             @{{ name }}_was ||= @{{column_name}}_was.try { |was| {{ enum_type }}.parse(was.to_s) }
           end
 
-          def {{name}}=(val : {{enum_type}})
+          def {{name}}=(val : {{enum_type}} | Nil)
             if !@{{name}}_changed && @{{name}} != val
               @{{name}}_changed = true
               @{{name}}_was = @{{name}}
             end
-            self.{{column_name}} = val.to_s
+
+            self.{{column_name}} = val.try &.to_s
             @{{name}} = val
           end
 
@@ -159,14 +160,14 @@ abstract class ActiveModel::Model
             @{{ name }}_was ||= @{{column_name}}_was.try { |was| {{enum_type}}.from_value(was.to_i32) }
           end
 
-          def {{name}}=(val : {{enum_type}})
+          def {{name}}=(val : {{enum_type}} | Nil)
             if !@{{name}}_changed && @{{name}} != val
               @{{name}}_changed = true
               @{{name}}_was = @{{name}}
             end
 
             @{{name}} = val
-            self.{{column_name}} = val.value
+            self.{{column_name}} = val.try &.value
           end
       {% end %}
     {% end %}
