@@ -122,21 +122,32 @@ abstract class ActiveModel::Model
         {% column_name = ENUM_FIELDS[name][:column_name].id %}
 
         def {{ name }}_changed?
-          !!@{{column_name}}_changed
+          {{column_name}}_changed?
+        end
+
+        def {{name}}_will_change!
+          @{{name}}_changed = true
+          @{{column_name}}_changed = true
+          @{{column_name}}_was = @{{column_name}}.dup
+          @{{name}}_was = @{{name}}.dup
         end
 
         {% if column_type.stringify == "String" %}
-          def {{name}} : {{enum_type}}
-            @{{name}} ||= {{enum_type}}.parse(@{{column_name}}.to_s)
+          def {{ name }} : {{ enum_type }}?
+            @{{name}} ||= @{{column_name}}_was.try { |was| {{ enum_type }}.parse(was.to_s) }
           end
 
-          def {{ name }}_was
-            @{{ name }}_was ||= {{enum_type}}.parse?(@{{column_name}}_was.to_s)
+          def {{ name }}_was : {{ enum_type }}?
+            @{{ name }}_was ||= @{{column_name}}_was.try { |was| {{ enum_type }}.parse(was.to_s) }
           end
 
           def {{name}}=(val : {{enum_type}})
+            if !@{{name}}_changed && @{{name}} != val
+              @{{name}}_changed = true
+              @{{name}}_was = @{{name}}
+            end
+            self.{{column_name}} = val.to_s
             @{{name}} = val
-            @{{column_name}} = val.to_s
           end
 
         {% elsif column_type.stringify == "Int32" %}
@@ -144,15 +155,20 @@ abstract class ActiveModel::Model
             @{{name}} ||= {{enum_type}}.new(@{{column_name}}.not_nil!.to_i32)
           end
 
-          def {{ name }}_was
-            @{{ name }}_was ||= {{enum_type}}.parse?(@{{column_name}}_was.try(&.to_i32))
+          def {{ name }}_was : {{ enum_type }}?
+            @{{ name }}_was ||= @{{column_name}}_was.try { |was| {{enum_type}}.from_value(was.to_i32) }
           end
 
           def {{name}}=(val : {{enum_type}})
+            if !@{{name}}_changed && @{{name}} != val
+              @{{name}}_changed = true
+              @{{name}}_was = @{{name}}
+            end
+
             @{{name}} = val
-            @{{column_name}} = val.value
+            self.{{column_name}} = val.value
           end
-        {% end %}
+      {% end %}
     {% end %}
 
     def assign_attributes(
@@ -222,6 +238,9 @@ abstract class ActiveModel::Model
     {% if HAS_KEYS[0] %}
       {% for name, opts in FIELDS %}
         @{{name}}_was : {{opts[:klass]}} | Nil
+      {% end %}
+      {% for name, opts in ENUM_FIELDS %}
+        @{{name}}_was : {{opts[:enum_type]}} | Nil
       {% end %}
     {% end %}
 

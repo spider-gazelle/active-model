@@ -195,7 +195,6 @@ describe ActiveModel::Model do
 
     it "should serialize/deserialize enum attributes" do
       model = EnumAttributes.new(size: EnumAttributes::Size::Medium)
-
       model_json = model.to_json
       parsed_model = EnumAttributes.from_trusted_json(model_json)
       parsed_model.product.should eq model.product
@@ -208,6 +207,20 @@ describe ActiveModel::Model do
 
       model._size_int.should eq EnumAttributes::Size::Medium.value
       model._product_int.should eq EnumAttributes::Product::Fries.to_i
+    end
+
+    it "tracks changes to enum attributes" do
+      model = EnumAttributes.new(size: EnumAttributes::Size::Medium)
+      model.clear_changes_information
+
+      model.size_changed?.should be_false
+      model.size = EnumAttributes::Size::Small
+      model.size_changed?.should be_true
+      model.size_was.should eq EnumAttributes::Size::Medium
+
+      model.clear_changes_information
+      model.size_will_change!
+      model.size_changed?.should be_true
     end
   end
 
