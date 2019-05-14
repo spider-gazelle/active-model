@@ -224,6 +224,47 @@ describe ActiveModel::Model do
     end
   end
 
+  describe "#assign_attributes_from_json" do
+    it "updates from IO" do
+      base = BaseKlass.new
+      updated_attributes = {integer: 100}
+
+      update_json = updated_attributes.to_json
+
+      body = IO::Sized.new(IO::Memory.new(update_json), read_size: update_json.bytesize)
+
+      base.assign_attributes_from_json(body)
+      base.integer.should eq 100
+    end
+
+    it "updates from String" do
+      base = BaseKlass.new
+      updated_attributes = {integer: 100}
+      base.assign_attributes_from_json(updated_attributes.to_json)
+      base.integer.should eq 100
+    end
+  end
+
+  describe "#assign_attributes_from_yaml" do
+    it "updates from IO" do
+      base = BaseKlass.new
+      updated_attributes = {integer: 100}
+
+      update_yaml = updated_attributes.to_yaml.to_s
+      body = IO::Sized.new(IO::Memory.new(update_yaml), read_size: update_yaml.bytesize)
+
+      base.assign_attributes_from_yaml(body)
+      base.integer.should eq 100
+    end
+
+    it "updates from String" do
+      base = BaseKlass.new
+      updated_attributes = {integer: 100}
+      base.assign_attributes_from_yaml(updated_attributes.to_yaml.to_s)
+      base.integer.should eq 100
+    end
+  end
+
   describe "assign_attributes" do
     it "assigns several attributes" do
       bk = BaseKlass.new

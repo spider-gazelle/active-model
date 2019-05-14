@@ -409,6 +409,7 @@ abstract class ActiveModel::Model
       end
 
       def assign_attributes_from_json(json)
+        json = json.read_string(json.read_remaining) if json.responds_to? :read_remaining && json.responds_to? :read_string
         model = self.class.from_json(json)
         data = JSON.parse(json)
         {% for name, opts in FIELDS %}
@@ -419,6 +420,7 @@ abstract class ActiveModel::Model
       end
 
       def assign_attributes_from_trusted_json(json)
+        json = json.read_string(json.read_remaining) if json.responds_to? :read_remaining && json.responds_to? :read_string
         model = self.class.from_trusted_json(json)
         data = JSON.parse(json)
         {% for name, opts in FIELDS %}
@@ -428,6 +430,7 @@ abstract class ActiveModel::Model
 
       # Uses the YAML parser as JSON is valid YAML
       def assign_attributes_from_yaml(yaml)
+        yaml = yaml.read_string(yaml.read_remaining) if yaml.responds_to? :read_remaining && yaml.responds_to? :read_string
         model = self.class.from_yaml(yaml)
         data = YAML.parse(yaml)
         {% for name, opts in FIELDS %}
@@ -438,6 +441,7 @@ abstract class ActiveModel::Model
       end
 
       def assign_attributes_from_trusted_yaml(yaml)
+        yaml = yaml.read_string(yaml.read_remaining) if yaml.responds_to? :read_remaining && yaml.responds_to? :read_string
         model = self.class.from_trusted_yaml(yaml)
         data = YAML.parse(yaml)
         {% for name, opts in FIELDS %}
