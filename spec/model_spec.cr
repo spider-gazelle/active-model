@@ -55,6 +55,10 @@ class Changes < BaseKlass
   attribute arr : Array(Int32) = [1, 2, 3]
 end
 
+class Defaults < BaseKlass
+  attribute false_default : Bool = false
+end
+
 describe ActiveModel::Model do
   describe "class definitions" do
     it "should provide the list of attributes" do
@@ -66,11 +70,12 @@ describe ActiveModel::Model do
 
   describe "initialization" do
     it "creates a new model with defaults" do
-      bk = BaseKlass.new
+      bk = Defaults.new
       bk.attributes.should eq({
-        :string     => "hello",
-        :integer    => 45,
-        :no_default => nil,
+        :string        => "hello",
+        :integer       => 45,
+        :false_default => false,
+        :no_default    => nil,
       })
     end
 

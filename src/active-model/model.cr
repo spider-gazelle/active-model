@@ -517,7 +517,7 @@ abstract class ActiveModel::Model
       }
     %}
     {% HAS_KEYS[0] = true %}
-    {% if name.value %}
+    {% if name.value || name.value == false %}
       {% DEFAULTS[name.var.id] = name.value %}
     {% end %}
   end
