@@ -48,7 +48,7 @@ class EnumAttributes < ActiveModel::Model
   end
 
   enum_attribute size : Size, column_type: Int32, custom_tag: "what what"
-  enum_attribute product : Product = Product::Fries
+  enum_attribute product : Product = Product::Fries, column_type: String
 end
 
 class Changes < BaseKlass
@@ -210,8 +210,11 @@ describe ActiveModel::Model do
     it "should serialize enum attributes to a concrete value" do
       model = EnumAttributes.new(size: EnumAttributes::Size::Medium)
 
-      model._size_int.should eq EnumAttributes::Size::Medium.value
-      model._product_int.should eq EnumAttributes::Product::Fries.to_i
+      json = JSON.parse(model.to_json)
+      yaml = YAML.parse(model.to_yaml)
+
+      yaml["size"].should eq EnumAttributes::Size::Medium.to_i
+      json["product"].should eq EnumAttributes::Product::Fries.to_s
     end
 
     it "tracks changes to enum attributes" do

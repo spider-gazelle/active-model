@@ -31,7 +31,7 @@ p.attributes # => {:name => "Bob Jane", :age => 32}
 
 The `attribute` macro takes two parameters. The field name with type and an optional default value.
 
-#### `enum_attibutes`
+#### `enum_attributes`
 
 Allows type safe enum defined attributes.<br>
 Same signature as `attribute` with an extra optional parameter to specify the serialisation of the enum member to either String or Int32, default is Int32.
