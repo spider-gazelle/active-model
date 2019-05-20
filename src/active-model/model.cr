@@ -11,7 +11,6 @@ abstract class ActiveModel::Model
     DEFAULTS = {} of Nil => Nil
     HAS_KEYS = [false]
     FIELDS = {} of Nil => Nil
-    ENUM_FIELDS = {} of Nil => Nil
     PERSIST = {} of Nil => Nil
 
     # Process attributes must be called while constants are in scope
@@ -101,9 +100,6 @@ abstract class ActiveModel::Model
         {% for name, index in FIELDS.keys %}
           :{{name.id}},
         {% end %}
-        {% for name, index in ENUM_FIELDS.keys %}
-          :{{name.id}},
-        {% end %}
       ] {% if !HAS_KEYS[0] %} of Nil {% end %}
     end
 
@@ -115,62 +111,6 @@ abstract class ActiveModel::Model
         {% end %}
       } {% if PERSIST.empty? %} of Nil => Nil {% end %}
     end
-
-    {% for name, index in ENUM_FIELDS.keys %}
-        {% enum_type = ENUM_FIELDS[name][:enum_type].id %}
-        {% column_type = ENUM_FIELDS[name][:column_type].id %}
-        {% column_name = ENUM_FIELDS[name][:column_name].id %}
-
-        def {{ name }}_changed?
-          {{column_name}}_changed?
-        end
-
-        def {{name}}_will_change!
-          @{{name}}_changed = true
-          @{{column_name}}_changed = true
-          @{{column_name}}_was = @{{column_name}}.dup
-          @{{name}}_was = @{{name}}.dup
-        end
-
-        {% if column_type.stringify == "String" %}
-          def {{ name }} : {{ enum_type }}?
-            @{{name}} ||= @{{column_name}}_was.try { |was| {{ enum_type }}.parse(was.to_s) }
-          end
-
-          def {{ name }}_was : {{ enum_type }}?
-            @{{ name }}_was ||= @{{column_name}}_was.try { |was| {{ enum_type }}.parse(was.to_s) }
-          end
-
-          def {{name}}=(val : {{enum_type}} | Nil)
-            if !@{{name}}_changed && @{{name}} != val
-              @{{name}}_changed = true
-              @{{name}}_was = @{{name}}
-            end
-
-            self.{{column_name}} = val.try &.to_s
-            @{{name}} = val
-          end
-
-        {% elsif column_type.stringify == "Int32" %}
-          def {{name}} : {{enum_type}}
-            @{{name}} ||= {{enum_type}}.new(@{{column_name}}.not_nil!.to_i32)
-          end
-
-          def {{ name }}_was : {{ enum_type }}?
-            @{{ name }}_was ||= @{{column_name}}_was.try { |was| {{enum_type}}.from_value(was.to_i32) }
-          end
-
-          def {{name}}=(val : {{enum_type}} | Nil)
-            if !@{{name}}_changed && @{{name}} != val
-              @{{name}}_changed = true
-              @{{name}}_was = @{{name}}
-            end
-
-            @{{name}} = val
-            self.{{column_name}} = val.try &.value
-          end
-      {% end %}
-    {% end %}
 
     def assign_attributes(
       {% for name, opts in FIELDS %}
@@ -240,9 +180,6 @@ abstract class ActiveModel::Model
       {% for name, opts in FIELDS %}
         @{{name}}_was : {{opts[:klass]}} | Nil
       {% end %}
-      {% for name, opts in ENUM_FIELDS %}
-        @{{name}}_was : {{opts[:enum_type]}} | Nil
-      {% end %}
     {% end %}
 
     def changed_attributes
@@ -307,14 +244,8 @@ abstract class ActiveModel::Model
       {% for name, opts in FIELDS %}
         {{name}} : {{opts[:klass]}} | Nil = nil,
       {% end %}
-      {% for name, opts in ENUM_FIELDS %}
-        {{name}} : {{opts[:enum_type]}} | Nil = nil,
-      {% end %}
     )
       {% for name, opts in FIELDS %}
-        self.{{name}} = {{name}} unless {{name}}.nil?
-      {% end %}
-      {% for name, opts in ENUM_FIELDS %}
         self.{{name}} = {{name}} unless {{name}}.nil?
       {% end %}
 
@@ -451,37 +382,46 @@ abstract class ActiveModel::Model
     {% end %}
   end
 
-  # Allow enum attributes. Persisted as either String | Int32
+  # Allow enum attributes. Persisted as either String | Int
   macro enum_attribute(name, column_type = Int32, mass_assignment = true, persistence = true, **tags)
-    {% enum_type = name.type %}
-    {% normalized_enum_name = "_" + enum_type.stringify.gsub(/::/, "_").underscore.downcase %}
+    {% column_type_str = column_type.stringify %}
+    {{ raise("enum_attribute: column_type must be (Int32 | String).class, given #{column_type_str}") unless column_type_str == "Int32" || column_type_str == "String" }}
 
-    # Define a column name for the serialized enum value
-    {% if column_type.stringify == "String" %}
-    {% column_name = (normalized_enum_name + "_str").id %}
-    {% elsif column_type.stringify == "Int32" %}
-    {% column_name = (normalized_enum_name + "_int").id %}
-    {% end %}
-
-    # Default enum value serialization
-    {% if name.value %}
-      {% if column_type.stringify == "String" %}
-        attribute {{ column_name }} : String = {{ name.value }}.to_s, mass_assignment: {{mass_assignment}}, persistence: {{persistence}}{% if !tags.empty? %}, tags: {{tags}} {% end %}
-      {% elsif column_type.stringify == "Int32" %}
-        attribute {{ column_name }} : Int32 = {{ name.value }}.to_i, mass_assignment: {{mass_assignment}}, persistence: {{persistence}}{% if !tags.empty? %}, tags: {{tags}} {% end %}
-      {% end %}
+    {% if column_type_str == "Int32" %}
+      {% serialise = :to_i.id %}
+      {% json_type = :number.id %}
     {% else %}
-        # No default
-        attribute {{ column_name }} : {{ column_type.id }}, mass_assignment: {{mass_assignment}}, persistence: {{persistence}}{% if !tags.empty? %}, tags: {{tags}} {% end %}
+      {% serialise = :to_s.id %}
+      {% json_type = :string.id %}
     {% end %}
 
-    {%
-      ENUM_FIELDS[name.var.id] = {
-        enum_type:   enum_type.id,
-        column_type: column_type.id,
-        column_name: column_name.id,
-      }
-    %}
+    {% enum_type = name.type %}
+    {% converter = (enum_type.stringify + "Converter").id %}
+
+    class {{ converter }}
+      def self.from_json(value : JSON::PullParser) : {{enum_type}}
+        {{enum_type}}.new(value)
+      end
+
+      def self.to_json(value : {{enum_type}}, json : JSON::Builder)
+        json.{{json_type}}(value.{{serialise}})
+      end
+
+      def self.from_yaml(ctx : YAML::ParseContext, node : YAML::Nodes::Node) : {{enum_type}}
+        {{enum_type}}.new(ctx, node)
+      end
+
+      def self.to_yaml(value : {{enum_type}}, yaml : YAML::Nodes::Builder)
+        yaml.scalar(value.{{serialise}})
+      end
+    end
+
+    # Set an attribute with the converter
+    {% if name.value %}
+        attribute {{ name.var }} : {{ enum_type }} = {{ name.value }}, mass_assignment: {{mass_assignment}}, persistence: {{persistence}}, converter: {{ converter }} {% if !tags.empty? %}, tags: {{tags}} {% end %}
+    {% else %}
+        attribute {{ name.var }} : {{ enum_type }}, mass_assignment: {{mass_assignment}}, persistence: {{persistence}}, converter: {{ converter }} {% if !tags.empty? %}, tags: {{tags}} {% end %}
+    {% end %}
   end
 
   macro attribute(name, converter = nil, mass_assignment = true, persistence = true, **tags)
