@@ -395,7 +395,7 @@ abstract class ActiveModel::Model
       {% json_type = :string.id %}
     {% end %}
 
-    {% enum_type = name.type %}
+    {% enum_type = name.type.resolve %}
     {% converter = (enum_type.stringify + "Converter").id %}
 
     class {{ converter }}
