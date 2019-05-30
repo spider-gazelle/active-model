@@ -390,6 +390,28 @@ describe ActiveModel::Model do
       klass.string_changed?.should eq false
       klass.string.should eq "hello"
     end
+
+    it "should serialise changes to json" do
+      model = AttributeOptions.new(bob: "lob law")
+      model.clear_changes_information
+      new_time = Time.unix(100000)
+      model.time = new_time
+
+      changes = JSON.parse(model.changed_json).as_h
+      changes.keys.size.should eq 1
+      changes["time"].should eq new_time.to_unix
+    end
+
+    it "should serialise changes to yaml" do
+      model = AttributeOptions.new(bob: "lob law")
+      model.clear_changes_information
+      new_time = Time.unix(100000)
+      model.time = new_time
+
+      changes = YAML.parse(model.changed_yaml).as_h
+      changes.keys.size.should eq 1
+      changes["time"].should eq new_time.to_unix
+    end
   end
 
   describe "attribute options" do
