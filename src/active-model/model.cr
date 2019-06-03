@@ -190,6 +190,22 @@ abstract class ActiveModel::Model
       all
     end
 
+    def changed_json
+      all = JSON.parse(self.to_json).as_h
+      {% for name, index in FIELDS.keys %}
+        all.delete({{name.stringify}}) unless @{{name}}_changed
+      {% end %}
+      all.to_json
+    end
+
+    def changed_yaml
+      all = JSON.parse(self.to_json).as_h
+      {% for name, index in FIELDS.keys %}
+        all.delete({{name.stringify}}) unless @{{name}}_changed
+      {% end %}
+      all.to_yaml
+    end
+
     def clear_changes_information
       {% if HAS_KEYS[0] %}
         {% for name, index in FIELDS.keys %}
