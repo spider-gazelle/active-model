@@ -34,7 +34,7 @@ The `attribute` macro takes two parameters. The field name with type and an opti
 #### `enum_attributes`
 
 Allows type safe enum defined attributes.<br>
-Same signature as `attribute` with an extra optional parameter to specify the serialisation of the enum member to either String or Int32, default is Int32.
+Same signature as `attribute` with an optional parameter `column_type` to specify the serialisation of the enum member to either String or Int32, default is Int32.
 
 ```ruby
 require "active-model"
@@ -45,7 +45,7 @@ class Order < ActiveModel::Model
    Burger
   end
 
-  enum_attribute product : Product = Product::Fries
+  enum_attribute product : Product = Product::Fries, column_type: String
 end
 ```
 
