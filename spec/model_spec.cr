@@ -22,6 +22,14 @@ class AttributeOptions < ActiveModel::Model
   attribute weird : String | Int32
 end
 
+class SetterBlock < BaseKlass
+  attribute that_is : String = "cool"
+  attribute tricky : String do |t|
+    self.that_is = "not ok"
+    t.try &.downcase
+  end
+end
+
 class Inheritance < BaseKlass
   attribute boolean : Bool = true
 
@@ -188,6 +196,15 @@ describe ActiveModel::Model do
         :integer    => 45,
         :no_default => nil,
       })
+    end
+
+    it "should allow overriding of assignment" do
+      m = SetterBlock.new
+      m.that_is.should eq "cool"
+
+      m.tricky = "BUSINESS"
+      m.tricky.should eq "business"
+      m.that_is.should eq "not ok"
     end
   end
 

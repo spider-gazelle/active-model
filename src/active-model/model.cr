@@ -281,7 +281,13 @@ abstract class ActiveModel::Model
           @{{name}}_changed = true
           @{{name}}_was = @{{name}}
         end
-        @{{name}} = value
+        {% if opts[:setter_block] %}
+          @{{name}} = ->({{ opts[:setter_block].args.first }} : {{opts[:klass]}} | Nil){
+            {{ opts[:setter_block].body }}
+          }.call value
+        {% else %}
+          @{{name}} = value
+        {% end %}
       end
     {% end %}
   end
@@ -440,7 +446,7 @@ abstract class ActiveModel::Model
     {% end %}
   end
 
-  macro attribute(name, converter = nil, mass_assignment = true, persistence = true, **tags)
+  macro attribute(name, converter = nil, mass_assignment = true, persistence = true, **tags, &block)
     @{{name.var}} : {{name.type}} | Nil
     # Attribute default value
     def {{name.var}}_default : {{name.type}} | Nil
@@ -461,6 +467,7 @@ abstract class ActiveModel::Model
         mass_assign:    mass_assignment,
         should_persist: persistence,
         tags:           tags,
+        setter_block:   block,
       }
     %}
     {%
@@ -470,6 +477,7 @@ abstract class ActiveModel::Model
         mass_assign:    mass_assignment,
         should_persist: persistence,
         tags:           tags,
+        setter_block:   block,
       }
     %}
     {% HAS_KEYS[0] = true %}
