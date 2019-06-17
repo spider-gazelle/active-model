@@ -467,7 +467,7 @@ abstract class ActiveModel::Model
         mass_assign:    mass_assignment,
         should_persist: persistence,
         tags:           tags,
-        setter_block:   block,
+        setter_block:   block || nil,
       }
     %}
     {%
@@ -477,7 +477,7 @@ abstract class ActiveModel::Model
         mass_assign:    mass_assignment,
         should_persist: persistence,
         tags:           tags,
-        setter_block:   block,
+        setter_block:   block || nil,
       }
     %}
     {% HAS_KEYS[0] = true %}
