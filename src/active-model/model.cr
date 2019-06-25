@@ -12,6 +12,7 @@ abstract class ActiveModel::Model
     HAS_KEYS = [false]
     FIELDS = {} of Nil => Nil
     PERSIST = {} of Nil => Nil
+    SETTERS = {} of Nil => Nil
 
     # Process attributes must be called while constants are in scope
     macro finished
@@ -281,9 +282,9 @@ abstract class ActiveModel::Model
           @{{name}}_changed = true
           @{{name}}_was = @{{name}}
         end
-        {% if opts[:setter_block] %}
-          @{{name}} = ->({{ opts[:setter_block].args.first }} : {{opts[:klass]}} | Nil){
-            {{ opts[:setter_block].body }}
+        {% if SETTERS[name] %}
+          @{{name}} = ->({{ SETTERS[name].args.first }} : {{opts[:klass]}} | Nil){
+            {{ SETTERS[name].body }}
           }.call value
         {% else %}
           @{{name}} = value
@@ -460,6 +461,9 @@ abstract class ActiveModel::Model
     {% if tags.empty? == true %}
       {% tags = nil %}
     {% end %}
+
+    {% SETTERS[name.var.id] = block || nil %}
+
     {%
       LOCAL_FIELDS[name.var.id] = {
         klass:          name.type,
@@ -467,7 +471,6 @@ abstract class ActiveModel::Model
         mass_assign:    mass_assignment,
         should_persist: persistence,
         tags:           tags,
-        setter_block:   block || nil,
       }
     %}
     {%
@@ -477,7 +480,6 @@ abstract class ActiveModel::Model
         mass_assign:    mass_assignment,
         should_persist: persistence,
         tags:           tags,
-        setter_block:   block || nil,
       }
     %}
     {% HAS_KEYS[0] = true %}
