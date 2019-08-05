@@ -526,7 +526,7 @@ describe ActiveModel::Model do
 
     describe "persistence" do
       it "should allow non-persisted attributes" do
-        time = Time.utc_now
+        time = Time.utc
         bob = "sick"
         feeling = "ill"
         weird = "object"
@@ -546,7 +546,7 @@ describe ActiveModel::Model do
       end
 
       it "should prevent json serialisation of non-persisted attributes" do
-        time = Time.utc_now
+        time = Time.utc
         bob = "lob"
         feeling = "free"
         weird = "sauce"
