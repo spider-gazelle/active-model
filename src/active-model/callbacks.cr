@@ -37,13 +37,15 @@ module ActiveModel::Callbacks
     end
 
     macro __{{name.id}}
-      \{% for callback in CALLBACKS[{{name}}] %}
-        \{% if callback.is_a? Block %}
-          begin
-            \{{callback.body}}
-          end
-        \{% else %}
-          \{{callback.id}}
+      \{% for callbacks in ([@type] + @type.ancestors.select { |c| c.has_constant?("CALLBACKS") }).map { |c| c.constant("CALLBACKS") } %}
+        \{% for callback in callbacks[{{name}}] %}
+          \{% if callback.is_a? Block %}
+            begin
+              \{{callback.body}}
+            end
+          \{% else %}
+            \{{callback.id}}
+          \{% end %}
         \{% end %}
       \{% end %}
     end
