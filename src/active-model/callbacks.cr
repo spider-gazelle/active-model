@@ -16,12 +16,12 @@ module ActiveModel::Callbacks
 
       # Wrap a block with callbacks for the appropriate crud operation
       {% for crud in {:create, :save, :update, :destroy} %}
-      def run_{{crud.id}}_callbacks(&block)
-        __before_{{crud.id}}
-        result = yield
-        __after_{{crud.id}}
-        result
-      end
+        def run_{{crud.id}}_callbacks(&block)
+          __before_{{crud.id}}
+          result = yield
+          __after_{{crud.id}}
+          result
+        end
       {% end %}
     end
   end
