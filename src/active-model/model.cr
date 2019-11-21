@@ -134,11 +134,15 @@ abstract class ActiveModel::Model
           self.{{name}} = {{name}} unless {{ name }}.nil?
         {% end %}
       {% end %}
+
+      self
     end
 
     # Accept HTTP params
     def assign_attributes(params : HTTP::Params | Hash(String, String) | Tuple(String, String))
       __from_object_params__(params)
+
+      self
     end
   end
 
@@ -386,6 +390,8 @@ abstract class ActiveModel::Model
             self.{{name}} = model.{{name}} if data[{{name.stringify}}]?
           {% end %}
         {% end %}
+
+        self
       end
 
       def assign_attributes_from_trusted_json(json)
@@ -395,6 +401,8 @@ abstract class ActiveModel::Model
         {% for name, opts in FIELDS %}
           self.{{name}} = model.{{name}} if data[{{name.stringify}}]?
         {% end %}
+
+        self
       end
 
       # Uses the YAML parser as JSON is valid YAML
@@ -407,6 +415,8 @@ abstract class ActiveModel::Model
             self.{{name}} = model.{{name}} if data[{{name.stringify}}]?
           {% end %}
         {% end %}
+
+        self
       end
 
       def assign_attributes_from_trusted_yaml(yaml)
@@ -416,6 +426,8 @@ abstract class ActiveModel::Model
         {% for name, opts in FIELDS %}
           self.{{name}} = model.{{name}} if data[{{name.stringify}}]?
         {% end %}
+
+        self
       end
     {% end %}
   end
