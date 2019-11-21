@@ -1,4 +1,5 @@
 module ActiveModel::Callbacks
+  # :nodoc:
   CALLBACK_NAMES = %w(before_save after_save before_create after_create before_update after_update before_destroy after_destroy)
 
   macro included
@@ -36,6 +37,7 @@ module ActiveModel::Callbacks
       \{% end %}
     end
 
+    # :nodoc:
     macro __{{name.id}}
       \{% for callbacks in ([@type] + @type.ancestors.select { |c| c.has_constant?("CALLBACKS") }).map { |c| c.constant("CALLBACKS") } %}
         \{% for callback in callbacks[{{name}}] %}

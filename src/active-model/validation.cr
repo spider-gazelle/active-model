@@ -14,6 +14,8 @@ module ActiveModel::Validation
     self.errors << ActiveModel::Error.new(self, field, message)
   end
 
+  # :nodoc:
+  # Set ActiveModel::Validation type
   macro __set_amv_type__
     {% AM_PARENT_TYPE[:type] = @type.name %}
   end
@@ -58,6 +60,7 @@ module ActiveModel::Validation
     validate :ignore, "", %proc, {{options[:if]}}, {{options[:unless]}}
   end
 
+  # :nodoc:
   macro __numericality__(allow_nil, fields, num, message, operation, positive, negative)
     {% if num %}
       {% for field, index in fields %}

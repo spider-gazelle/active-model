@@ -3,6 +3,7 @@ require "yaml"
 require "http/params"
 
 abstract class ActiveModel::Model
+  # :nodoc:
   FIELD_MAPPINGS = {} of Nil => Nil
 
   macro inherited
@@ -39,6 +40,7 @@ abstract class ActiveModel::Model
 
   def changed_attributes; end
 
+  # :nodoc:
   macro __process_attributes__
     {% klasses = @type.ancestors %}
     {% FIELD_MAPPINGS[@type] = {} of Nil => Nil %}
@@ -131,6 +133,7 @@ abstract class ActiveModel::Model
     end
   end
 
+  # :nodoc:
   macro __from_object_params__(params)
     {% for name, opts in FIELDS %}
       {% if opts[:mass_assign] %}
@@ -175,6 +178,7 @@ abstract class ActiveModel::Model
   macro __customize_orm__
   end
 
+  # :nodoc:
   macro __track_changes__
     # Define instance variable types
     {% if HAS_KEYS[0] %}
@@ -256,6 +260,7 @@ abstract class ActiveModel::Model
     end
   end
 
+  # :nodoc:
   macro __create_initializer__
     def initialize(
       {% for name, opts in FIELDS %}
@@ -293,6 +298,7 @@ abstract class ActiveModel::Model
     {% end %}
   end
 
+  # :nodoc:
   # Adds the from_json method
   macro __map_json__
     {% if HAS_KEYS[0] && !PERSIST.empty? %}
