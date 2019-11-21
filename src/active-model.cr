@@ -1,5 +1,5 @@
 module ActiveModel
-  VERSION = "1.5.0"
+  VERSION = `shards version`
 end
 
 require "./active-model/*"

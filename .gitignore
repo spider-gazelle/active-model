@@ -1,5 +1,5 @@
 bin
-doc
+docs
 lib
 .crystal
 .shards
