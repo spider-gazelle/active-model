@@ -88,11 +88,20 @@ abstract class ActiveModel::Model
       {% end %}
     end
 
-    # Returns a hash of all the attribute values
+    # Returns a Hash of all the attribute values
     def attributes
       {
         {% for name, index in FIELDS.keys %}
           :{{name}} => @{{name}},
+        {% end %}
+      } {% if !HAS_KEYS[0] %} of Nil => Nil {% end %}
+    end
+
+    # Returns a NamedTuple of all attribute values
+    def attributes_tuple
+      {
+        {% for name, index in FIELDS.keys %}
+          {{name}}: @{{name}},
         {% end %}
       } {% if !HAS_KEYS[0] %} of Nil => Nil {% end %}
     end

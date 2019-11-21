@@ -524,6 +524,12 @@ describe ActiveModel::Model do
       opts.changed_attributes.should eq({:time => Time.unix(1459859782), :bob => "James"})
     end
 
+    it "#attributes_tuple creates a NamedTuple of attributes" do
+      klass = BaseKlass.new
+      klass.attributes_tuple.should be_a(NamedTuple(string: String?, integer: Int32?, no_default: String?))
+      klass.attributes_tuple.should eq({string: "hello", integer: 45, no_default: nil})
+    end
+
     describe "persistence" do
       it "should allow non-persisted attributes" do
         time = Time.utc
