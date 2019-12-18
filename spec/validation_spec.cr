@@ -70,18 +70,18 @@ describe ActiveModel::Validation do
     it "returns false if name is not present" do
       person = Person.new
       person.valid?.should eq false
-      person.errors[0].to_s.should eq "Name is required"
+      person.errors[0].to_s.should eq "name is required"
 
       person = Person.new(name: "")
       person.valid?.should eq false
-      person.errors[0].to_s.should eq "Name is required"
+      person.errors[0].to_s.should eq "name is required"
     end
 
     it "returns false if age is not present" do
       person = Person.new name: "bob"
       person.age = nil
       person.valid?.should eq false
-      person.errors[0].to_s.should eq "Age must be greater than 5"
+      person.errors[0].to_s.should eq "age must be greater than 5"
     end
   end
 
@@ -89,17 +89,17 @@ describe ActiveModel::Validation do
     it "returns false if age is not greater than 5" do
       person = Person.new name: "bob", age: 5
       person.valid?.should eq false
-      person.errors[0].to_s.should eq "Age must be greater than 5"
+      person.errors[0].to_s.should eq "age must be greater than 5"
     end
 
     it "returns false if rating is not set correctly" do
       person = Person.new name: "bob", age: 6, rating: -1
       person.valid?.should eq false
-      person.errors[0].to_s.should eq "Rating must be greater than or equal to 0"
+      person.errors[0].to_s.should eq "rating must be greater than or equal to 0"
 
       person = Person.new name: "bob", age: 6, rating: 101
       person.valid?.should eq false
-      person.errors[0].to_s.should eq "Rating must be less than or equal to 100"
+      person.errors[0].to_s.should eq "rating must be less than or equal to 100"
 
       person = Person.new name: "bob", age: 6, rating: 50
       person.valid?.should eq true
@@ -110,7 +110,7 @@ describe ActiveModel::Validation do
     it "should create and compare confirmation field" do
       person = Person.new name: "bob", gender: "female", gender_confirmation: "male"
       person.valid?.should eq false
-      person.errors[0].to_s.should eq "Gender doesn't match confirmation"
+      person.errors[0].to_s.should eq "gender doesn't match confirmation"
 
       # A nil version of the confirmation is ignored
       person = Person.new name: "bob", gender: "female"
@@ -125,7 +125,7 @@ describe ActiveModel::Validation do
     it "should work with inherited objects" do
       person = Model.new email: "steve@acaprojects.com", email_confirmation: "nothing"
       person.valid?.should eq false
-      person.errors[0].to_s.should eq "Email doesn't match confirmation"
+      person.errors[0].to_s.should eq "email doesn't match confirmation"
 
       person.email_confirmation = "steve@acaprojects.com"
       person.valid?.should eq true
@@ -178,7 +178,7 @@ describe ActiveModel::Validation do
 
       person.email = "bobgmail.com"
       person.valid?.should eq false
-      person.errors[0].to_s.should eq "Email is invalid"
+      person.errors[0].to_s.should eq "email is invalid"
 
       person.email = "bob@uni.edu"
       person.valid?.should eq false
@@ -194,7 +194,7 @@ describe ActiveModel::Validation do
     it "returns invalid if name is less than 2 characters" do
       person = Person.new(name: "JD")
       person.valid?.should eq false
-      person.errors[0].to_s.should eq "Name must be 3 characters long"
+      person.errors[0].to_s.should eq "name must be 3 characters long"
     end
   end
 
@@ -202,7 +202,7 @@ describe ActiveModel::Validation do
     it "allows definition of custom validation error" do
       model = CustomError.new
       model.valid?.should be_false
-      model.errors[0].to_s.should eq "Temperature is important, it must be divisible by 3"
+      model.errors[0].to_s.should eq "temperature is important, it must be divisible by 3"
       model.errors.size.should eq 1
     end
   end

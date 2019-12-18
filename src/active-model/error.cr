@@ -8,7 +8,7 @@ class ActiveModel::Error
     if @field == :__base__
       "#{@model.class.to_s} #{message}"
     else
-      "#{@field.to_s.gsub('_', ' ').capitalize} #{message}"
+      "#{@field.to_s} #{message}"
     end
   end
 end
