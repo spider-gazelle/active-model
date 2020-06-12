@@ -1,12 +1,16 @@
 name: active-model
-version: 1.8.2
+version: 1.8.3
 
 development_dependencies:
   ameba:
     github: veelenga/ameba
+  yaml_mapping:
+    github: crystal-lang/yaml_mapping.cr
+  json_mapping:
+    github: crystal-lang/json_mapping.cr
 
 authors:
-  - Stephen von Takach <steve@acaprojects.com>
-  - Caspian Baska <caspianbaska@gmail.com>
+  - Stephen von Takach <steve@place.tech>
+  - Caspian Baska <caspian@place.tech>
 
 license: MIT
