@@ -1,6 +1,8 @@
-require "json"
-require "yaml"
 require "http/params"
+require "json"
+require "json_mapping"
+require "yaml"
+require "yaml_mapping"
 
 abstract class ActiveModel::Model
   # :nodoc:
