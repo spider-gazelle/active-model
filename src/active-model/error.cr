@@ -6,9 +6,9 @@ class ActiveModel::Error
 
   def to_s
     if @field == :__base__
-      "#{@model.class.to_s} #{message}"
+      "#{@model.class} #{message}"
     else
-      "#{@field.to_s} #{message}"
+      "#{@field} #{message}"
     end
   end
 end
