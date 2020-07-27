@@ -151,10 +151,11 @@ module ActiveModel::Validation
           {% if confirmation == true || confirmation[:case_sensitive] != false %}
             this.{{field.id}} == confirmation
           {% else %}
-            if confirmation.nil? || this.{{field.id}}.nil?
-              this.{{field.id}} == confirmation
+            %field = this.{{field.id}}
+            if %field.nil? || confirmation.nil?
+              %field == confirmation
             else
-              this.{{field.id}}.not_nil!.downcase == confirmation.not_nil!.downcase
+              %field.try &.downcase == confirmation.downcase
             end
           {% end %}
         }, {{options[:if]}}, {{options[:unless]}}
@@ -255,6 +256,12 @@ module ActiveModel::Validation
 
   def valid?
     errors.clear
+
+    validate_nilability
+
+    # Early return if any non-nil fields hold no value
+    return false unless errors.empty?
+
     @@validators.each do |validator|
       positive = validator[:positive]
       if positive
@@ -270,6 +277,7 @@ module ActiveModel::Validation
         errors << Error.new(self, validator[:field], validator[:message])
       end
     end
+
     errors.empty?
   end
 

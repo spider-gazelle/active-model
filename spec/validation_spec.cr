@@ -13,10 +13,10 @@ end
 class Person < ORM
   attribute name : String
   attribute age : Int32 = 32
-  attribute rating : Int32
-  attribute gender : String
+  attribute rating : Int32?
+  attribute gender : String?
   attribute adult : Bool = true
-  attribute email : String
+  attribute email : String?
 
   validates :name, presence: true, length: {minimum: 3, too_short: "must be 3 characters long"}
   validates :age, numericality: {:greater_than => 5}
@@ -61,6 +61,14 @@ class CustomError < ORM
 end
 
 describe ActiveModel::Validation do
+  describe "nilability" do
+    it "validates all non-nillable fields have values" do
+      person = Person.new
+      person.valid?.should be_false
+      person.errors[0].to_s.should eq "name should not be nil"
+    end
+  end
+
   describe "presence" do
     it "validates presence of name" do
       person = Person.new(name: "John Doe")
@@ -68,20 +76,13 @@ describe ActiveModel::Validation do
     end
 
     it "returns false if name is not present" do
-      person = Person.new
+      person = Person.new(name: "")
       person.valid?.should eq false
       person.errors[0].to_s.should eq "name is required"
 
       person = Person.new(name: "")
       person.valid?.should eq false
       person.errors[0].to_s.should eq "name is required"
-    end
-
-    it "returns false if age is not present" do
-      person = Person.new name: "bob"
-      person.age = nil
-      person.valid?.should eq false
-      person.errors[0].to_s.should eq "age must be greater than 5"
     end
   end
 
