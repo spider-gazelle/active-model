@@ -164,13 +164,19 @@ describe ActiveModel::Model do
       bk = BaseKlass.new
       bk.string.should eq "hello"
       bk.integer.should eq 45
-      bk.no_default.should eq nil
+
+      expect_raises(NilAssertionError) do
+        bk.no_default
+      end
 
       i = Inheritance.new
       i.boolean.should eq true
       i.string.should eq "hello"
       i.integer.should eq 45
-      i.no_default.should eq nil
+
+      expect_raises(NilAssertionError) do
+        i.no_default
+      end
     end
 
     it "should allow attribute assignment" do

@@ -131,7 +131,7 @@ describe ActiveModel::Callbacks do
     context "on a single model" do
       it "should successfully trigger the callback block" do
         hero = BlockHero.new(name: "Groucho")
-        hero.id.should be_nil
+        hero.@id.should be_nil
         hero.before_create
 
         hero.id.should be_a(Int32)
@@ -140,7 +140,7 @@ describe ActiveModel::Callbacks do
 
       it "should successfully trigger the callback" do
         hero = Hero.new(name: "Groucho")
-        hero.id.should be_nil
+        hero.@id.should be_nil
         hero.before_create
 
         hero.id.should be_a(Int32)
@@ -156,7 +156,7 @@ describe ActiveModel::Callbacks do
         heroes << BlockHero.new(name: "Thing")
         heroes << BlockHero.new(name: "Human Torch")
 
-        heroes.all? { |hero| hero.id.nil? }.should be_true
+        heroes.all? { |hero| hero.@id.nil? }.should be_true
         heroes.each(&.before_create)
         heroes.all? { |hero| hero.id.is_a?(Int32) }.should be_true
         heroes.all? { |hero| hero.id == hero.name.try(&.size) }.should be_true
@@ -165,29 +165,15 @@ describe ActiveModel::Callbacks do
       it "should successfully trigger the callback" do
         heroes = [] of Hero
 
-        hero1 = Hero.new(name: "Mr. Fantastic")
-        hero2 = Hero.new(name: "Invisible Woman")
-        hero3 = Hero.new(name: "Thing")
-        hero4 = Hero.new(name: "Human Torch")
+        heroes << Hero.new(name: "Mr. Fantastic")
+        heroes << Hero.new(name: "Invisible Woman")
+        heroes << Hero.new(name: "Thing")
+        heroes << Hero.new(name: "Human Torch")
 
-        heroes << hero1
-        heroes << hero2
-        heroes << hero3
-        heroes << hero4
+        heroes.all? { |hero| hero.@id.nil? }.should be_true
 
-        # NOTE:: this avoides a compiler bug
-        # Error: BUG: ClassName+ has no types
-        # https://forum.crystal-lang.org/t/detecting-class-types/1090/8
-        # heroes << Hero.new(name: "Mr. Fantastic")
-        # heroes << Hero.new(name: "Invisible Woman")
-        # heroes << Hero.new(name: "Thing")
-        # heroes << Hero.new(name: "Human Torch")
+        heroes.each &.before_create
 
-        heroes.all? { |hero| hero.id.nil? }.should be_true
-        hero1.before_create
-        hero2.before_create
-        hero3.before_create
-        hero4.before_create
         heroes.all? { |hero| hero.id.is_a?(Int32) }.should be_true
         heroes.all? { |hero| hero.id == hero.name.try(&.size) }.should be_true
       end

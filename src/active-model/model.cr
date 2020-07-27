@@ -10,14 +10,22 @@ abstract class ActiveModel::Model
 
   macro inherited
     # Macro level constants
-    LOCAL_FIELDS = {} of Nil => Nil
+
+    # :nodoc:
+    LOCAL_FIELDS = {} of Symbol => Nil
+    # :nodoc:
     DEFAULTS = {} of Nil => Nil
+    # :nodoc:
     HAS_KEYS = [false]
-    FIELDS = {} of Nil => Nil
+    # :nodoc:
+    FIELDS = {} of Symbol => Nil
+    # :nodoc:
     PERSIST = {} of Nil => Nil
+    # :nodoc:
     SETTERS = {} of Nil => Nil
 
     # Process attributes must be called while constants are in scope
+
     macro finished
       __process_attributes__
       __customize_orm__
@@ -25,6 +33,8 @@ abstract class ActiveModel::Model
       __track_changes__
       __map_json__
       __create_initializer__
+      __getters__
+      __nilability_validation__
       {% end %}
     end
   end
@@ -32,15 +42,13 @@ abstract class ActiveModel::Model
   # Stub methods to prevent compiler errors
   def apply_defaults; end
 
-  def self.from_trusted_json(json : IO | String); end
-
-  def self.from_trusted_yaml(yaml : IO | String); end
-
   def changed?; end
 
   def clear_changes_information; end
 
   def changed_attributes; end
+
+  protected def validation_error; end
 
   # :nodoc:
   macro __process_attributes__
@@ -128,7 +136,7 @@ abstract class ActiveModel::Model
 
     def assign_attributes(
       {% for name, opts in FIELDS %}
-        {{name}} : {{opts[:klass]}} | Nil = nil,
+        {{name}} : {{opts[:klass]}} {% unless opts[:klass].nilable? %} | Nil {% end %} = nil,
       {% end %}
     )
       {% for name, opts in FIELDS %}
@@ -297,13 +305,14 @@ abstract class ActiveModel::Model
 
     # Override the map json
     {% for name, opts in FIELDS %}
-      def {{name}}=(value : {{opts[:klass]}} | Nil)
+      # {{name}} setter
+      def {{name}}=(value : {{opts[:klass]}})
         if !@{{name}}_changed && @{{name}} != value
           @{{name}}_changed = true
           @{{name}}_was = @{{name}}
         end
         {% if SETTERS[name] %}
-          @{{name}} = ->({{ SETTERS[name].args.first }} : {{opts[:klass]}} | Nil){
+          @{{name}} = ->({{ SETTERS[name].args.first }} : {{opts[:klass]}}){
             {{ SETTERS[name].body }}
           }.call value
         {% else %}
@@ -320,13 +329,14 @@ abstract class ActiveModel::Model
       JSON.mapping(
         {% for name, opts in PERSIST %}
           {% if opts[:converter] %}
-            {{name}}: { type: {{opts[:klass]}} | Nil, converter: {{opts[:converter]}} },
+            {{name}}: { type: {{opts[:type_signature]}}, setter: false, converter: {{opts[:converter]}} },
           {% else %}
-            {{name}}: {{opts[:klass]}} | Nil,
+            {{name}}: { type: {{opts[:type_signature]}}, setter: false },
           {% end %}
         {% end %}
       )
 
+      # :nodoc:
       def initialize(%pull : ::JSON::PullParser, trusted = false)
         previous_def(%pull)
         if !trusted
@@ -340,20 +350,22 @@ abstract class ActiveModel::Model
         clear_changes_information
       end
 
-      def self.from_trusted_json(json)
-        {{@type.name.id}}.new(::JSON::PullParser.new(json), true)
+      # Serialize from a trusted JSON source
+      def self.from_trusted_json(string_or_io : String | IO) : self
+        {{@type.name.id}}.new(::JSON::PullParser.new(string_or_io), true)
       end
 
       YAML.mapping(
         {% for name, opts in PERSIST %}
           {% if opts[:converter] %}
-            {{name}}: { type: {{opts[:klass]}} | Nil, converter: {{opts[:converter]}} },
+            {{name}}: { type: {{opts[:type_signature]}}, setter: false, converter: {{opts[:converter]}} },
           {% else %}
-            {{name}}: {{opts[:klass]}} | Nil,
+            {{name}}: { type: {{opts[:type_signature]}}, setter: false },
           {% end %}
         {% end %}
       )
 
+      # :nodoc:
       def initialize(%yaml : YAML::ParseContext, %node : ::YAML::Nodes::Node, _dummy : Nil, trusted = false)
         previous_def(%yaml, %node, nil)
         if !trusted
@@ -367,6 +379,7 @@ abstract class ActiveModel::Model
         clear_changes_information
       end
 
+      # Serialize from a trusted YAML source
       def self.from_trusted_yaml(string_or_io : String | IO) : self
         ctx = YAML::ParseContext.new
         node = begin
@@ -431,6 +444,36 @@ abstract class ActiveModel::Model
 
         self
       end
+
+    {% end %}
+  end
+
+  macro __nilability_validation__
+    def validate_nilability
+      {% if HAS_KEYS[0] && !PERSIST.empty? %}
+        {% for name, opts in PERSIST %}
+          {% if !opts[:klass].nilable? %}
+            validation_error({{name.symbolize}}, "should not be nil" ) if @{{name.id}}.nil?
+          {% end %}
+        {% end %}
+      {% end %}
+    end
+  end
+
+  macro __getters__
+    {% if HAS_KEYS[0] && !PERSIST.empty? %}
+      {% for name, opts in PERSIST %}
+        # {{name}} getter
+        def {{name}}
+          {% if opts[:klass].nilable? %}
+            @{{name.id}}
+          {% else %}
+            %value = @{{name.id}}
+            raise NilAssertionError.new("Nil for #{{{@type}}}##{{{name.stringify}}} : #{{{opts[:klass]}}}" ) if %value.nil?
+            %value
+          {% end %}
+        end
+      {% end %}
     {% end %}
   end
 
@@ -477,11 +520,20 @@ abstract class ActiveModel::Model
   end
 
   macro attribute(name, converter = nil, mass_assignment = true, persistence = true, **tags, &block)
-    @{{name.var}} : {{name.type}} | Nil
+    {% if name.type.resolve.nilable? %}
+      {% type_signature = name.type %}
+    {% else %}
+      {% type_signature = "#{name.type} | Nil".id %}
+    {% end %}
+
+    @{{name.var}} : {{type_signature.id}}
+
     # Attribute default value
-    def {{name.var}}_default : {{name.type}} | Nil
-      {% if name.value %}
+    def {{name.var}}_default : {{type_signature.id}}
+      {% if !name.value.nil? %}
         {{ name.value }}
+      {% elsif !name.type.resolve.nilable? %}
+        raise NilAssertionError.new("No default for #{{{@type}}}##{name.var}" )
       {% else %}
         nil
       {% end %}
@@ -495,20 +547,23 @@ abstract class ActiveModel::Model
 
     {%
       LOCAL_FIELDS[name.var.id] = {
-        klass:          name.type,
+        klass:          name.type.resolve,
         converter:      converter,
         mass_assign:    mass_assignment,
         should_persist: persistence,
         tags:           tags,
+        type_signature: type_signature,
       }
     %}
+
     {%
       FIELDS[name.var.id] = {
-        klass:          name.type,
+        klass:          name.type.resolve,
         converter:      converter,
         mass_assign:    mass_assignment,
         should_persist: persistence,
         tags:           tags,
+        type_signature: type_signature,
       }
     %}
     {% HAS_KEYS[0] = true %}
