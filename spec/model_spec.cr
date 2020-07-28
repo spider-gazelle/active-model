@@ -297,27 +297,12 @@ describe ActiveModel::Model do
   end
 
   describe "assign_attributes" do
-    it "assigns several attributes" do
-      bk = BaseKlass.new
-      bk.attributes.should eq({
-        :string     => "hello",
-        :integer    => 45,
-        :no_default => nil,
-      })
-
-      bk.assign_attributes(string: "what", integer: 42, no_default: "bath")
-      bk.attributes.should eq({
-        :string     => "what",
-        :integer    => 42,
-        :no_default => "bath",
-      })
-    end
-
     it "affects changes metadata" do
       bk = BaseKlass.new
       bk.clear_changes_information
 
-      bk.assign_attributes(string: "what")
+      params = HTTP::Params.new({"string" => ["what"]})
+      bk.assign_attributes(params)
       bk.changed_attributes.should eq({
         :string => "what",
       })
@@ -338,9 +323,11 @@ describe ActiveModel::Model do
     it "respects mass assignment preference option" do
       options = AttributeOptions.new
 
-      time = Time.unix(1459859781)
-      options.assign_attributes(time: time, bob: "Bilbo")
-      options.time.should eq time
+      weird = "name"
+      params = HTTP::Params.new({"weird" => [weird], "bob" => ["bilbo"]})
+
+      options.assign_attributes(params)
+      options.weird.should eq weird
       options.bob.should eq "Bobby"
     end
   end

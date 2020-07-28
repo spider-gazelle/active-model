@@ -134,20 +134,6 @@ abstract class ActiveModel::Model
       } {% if PERSIST.empty? %} of Nil => Nil {% end %}
     end
 
-    def assign_attributes(
-      {% for name, opts in FIELDS %}
-        {{name}} : {{opts[:klass]}} {% unless opts[:klass].nilable? %} | Nil {% end %} = nil,
-      {% end %}
-    )
-      {% for name, opts in FIELDS %}
-        {% if opts[:mass_assign] %}
-          self.{{name}} = {{name}} unless {{ name }}.nil?
-        {% end %}
-      {% end %}
-
-      self
-    end
-
     # Accept HTTP params
     def assign_attributes(params : HTTP::Params | Hash(String, String) | Tuple(String, String))
       __from_object_params__(params)
