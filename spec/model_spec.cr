@@ -141,7 +141,7 @@ describe ActiveModel::Model do
         :no_default => "jane",
       })
 
-      i = Inheritance.new({"string" => "bob", "no_default" => "jane", "boolean" => "True"})
+      i = Inheritance.new({"string" => "bob", "no_default" => "jane", "boolean" => "true"})
       i.attributes.should eq({
         :boolean    => true,
         :string     => "bob",
