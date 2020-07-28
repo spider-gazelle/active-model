@@ -388,7 +388,7 @@ abstract class ActiveModel::Model
         data = JSON.parse(json)
         {% for name, opts in FIELDS %}
           {% if opts[:mass_assign] %}
-            self.{{name}} = model.{{name}} if data[{{name.stringify}}]?
+            self.{{name}} = model.{{name}} if data[{{name.stringify}}]? && self.{{name}} != model.{{name}}
           {% end %}
         {% end %}
 
@@ -400,7 +400,7 @@ abstract class ActiveModel::Model
         model = self.class.from_trusted_json(json)
         data = JSON.parse(json)
         {% for name, opts in FIELDS %}
-          self.{{name}} = model.{{name}} if data[{{name.stringify}}]?
+          self.{{name}} = model.{{name}} if data[{{name.stringify}}]? && self.{{name}} != model.{{name}}
         {% end %}
 
         self
@@ -413,7 +413,7 @@ abstract class ActiveModel::Model
         data = YAML.parse(yaml)
         {% for name, opts in FIELDS %}
           {% if opts[:mass_assign] %}
-            self.{{name}} = model.{{name}} if data[{{name.stringify}}]?
+            self.{{name}} = model.{{name}} if data[{{name.stringify}}]? && self.{{name}} != model.{{name}}
           {% end %}
         {% end %}
 
@@ -425,7 +425,7 @@ abstract class ActiveModel::Model
         model = self.class.from_trusted_yaml(yaml)
         data = YAML.parse(yaml)
         {% for name, opts in FIELDS %}
-          self.{{name}} = model.{{name}} if data[{{name.stringify}}]?
+          self.{{name}} = model.{{name}} if data[{{name.stringify}}]? && self.{{name}} != model.{{name}}
         {% end %}
 
         self
