@@ -301,8 +301,7 @@ describe ActiveModel::Model do
       bk = BaseKlass.new
       bk.clear_changes_information
 
-      params = HTTP::Params.new({"string" => ["what"]})
-      bk.assign_attributes(params)
+      bk.assign_attributes(string: "what")
       bk.changed_attributes.should eq({
         :string => "what",
       })
@@ -323,11 +322,8 @@ describe ActiveModel::Model do
     it "respects mass assignment preference option" do
       options = AttributeOptions.new
 
-      weird = "name"
-      params = HTTP::Params.new({"weird" => [weird], "bob" => ["bilbo"]})
-
-      options.assign_attributes(params)
-      options.weird.should eq weird
+      options.assign_attributes(weird: "weird", bob: "bilbo")
+      options.weird.should eq "weird"
       options.bob.should eq "Bobby"
     end
   end
