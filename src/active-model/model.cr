@@ -11,6 +11,10 @@ abstract class ActiveModel::Model
   # :nodoc:
   FIELD_MAPPINGS = {} of Nil => Nil
 
+  module Missing
+    extend self
+  end
+
   macro inherited
     # Macro level constants
 
@@ -135,6 +139,18 @@ abstract class ActiveModel::Model
           :{{name}} => @{{name}},
         {% end %}
       } {% if PERSIST.empty? %} of Nil => Nil {% end %}
+    end
+
+    def assign_attributes(
+      {% for name, opts in FIELDS %}
+        {{name.id}} : {{opts[:klass]}} | Missing = Missing,
+      {% end %}
+    )
+      {% for name, opts in FIELDS %}
+        {% if opts[:mass_assign] == true %}
+          self.{{name.id}} = {{name.id}} unless {{name.id}}.is_a?(Missing)
+        {% end %}
+      {% end %}
     end
 
     # Accept HTTP params
