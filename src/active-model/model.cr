@@ -446,7 +446,7 @@ abstract class ActiveModel::Model
             @{{name.id}}
           {% else %}
             %value = @{{name.id}}
-            raise NilAssertionError.new("Nil for #{{{@type}}}##{{{name.stringify}}} : #{{{opts[:klass]}}}" ) if %value.nil?
+            raise NilAssertionError.new("Nil for {{@type}}{{'#'.id}}{{name.id}} : {{opts[:klass].id}}") if %value.nil?
             %value
           {% end %}
         end
@@ -489,7 +489,7 @@ abstract class ActiveModel::Model
     end
 
     # Set an attribute with the converter
-    {% if name.value %}
+    {% if name.value || name.value == false %}
         attribute {{ name.var }} : {{ enum_type }} = {{ name.value }}, mass_assignment: {{mass_assignment}}, persistence: {{persistence}}, converter: {{ converter }} {% if !tags.empty? %}, tags: {{tags}} {% end %}
     {% else %}
         attribute {{ name.var }} : {{ enum_type }}, mass_assignment: {{mass_assignment}}, persistence: {{persistence}}, converter: {{ converter }} {% if !tags.empty? %}, tags: {{tags}} {% end %}
@@ -510,7 +510,7 @@ abstract class ActiveModel::Model
       {% if !name.value.nil? %}
         {{ name.value }}
       {% elsif !name.type.resolve.nilable? %}
-        raise NilAssertionError.new("No default for #{{{@type}}}##{name.var}" )
+        raise NilAssertionError.new("No default for {{@type}}{{'#'.id}}{{name.var.id}}" )
       {% else %}
         nil
       {% end %}
