@@ -497,19 +497,20 @@ abstract class ActiveModel::Model
   end
 
   macro attribute(name, converter = nil, mass_assignment = true, persistence = true, **tags, &block)
-    {% if name.type.resolve.nilable? %}
-      {% type_signature = name.type %}
+    {% resolved_type = name.type.resolve %}
+    {% if resolved_type.nilable? %}
+      {% type_signature = resolved_type %}
     {% else %}
-      {% type_signature = "#{name.type} | Nil".id %}
+      {% type_signature = "#{resolved_type} | Nil".id %}
     {% end %}
 
     @{{name.var}} : {{type_signature.id}}
 
     # Attribute default value
-    def {{name.var}}_default : {{type_signature.id}}
-      {% if !name.value.nil? %}
+    def {{name.var.id}}_default : {{ name.type }}
+      {% if name.value || name.value == false %}
         {{ name.value }}
-      {% elsif !name.type.resolve.nilable? %}
+      {% elsif !resolved_type.nilable? %}
         raise NilAssertionError.new("No default for {{@type}}{{'#'.id}}{{name.var.id}}" )
       {% else %}
         nil
@@ -524,7 +525,7 @@ abstract class ActiveModel::Model
 
     {%
       LOCAL_FIELDS[name.var.id] = {
-        klass:          name.type.resolve,
+        klass:          resolved_type,
         converter:      converter,
         mass_assign:    mass_assignment,
         should_persist: persistence,
@@ -535,7 +536,7 @@ abstract class ActiveModel::Model
 
     {%
       FIELDS[name.var.id] = {
-        klass:          name.type.resolve,
+        klass:          resolved_type,
         converter:      converter,
         mass_assign:    mass_assignment,
         should_persist: persistence,
