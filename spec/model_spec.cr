@@ -169,6 +169,10 @@ describe ActiveModel::Model do
         bk.no_default
       end
 
+      expect_raises(NilAssertionError) do
+        bk.no_default_default
+      end
+
       i = Inheritance.new
       i.boolean.should eq true
       i.string.should eq "hello"
