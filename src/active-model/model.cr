@@ -112,6 +112,8 @@ abstract class ActiveModel::Model
       {% end %}
     {% end %}
 
+    # # NOTE: this can be moved into __map_json__ module because it is ok with JSON::Serializable
+    # # @[JSON::Field(ignore: true)]
     # Accessors for attributes without JSON mapping
     {% for name, opts in FIELDS %}
       {% unless opts[:should_persist] %}
@@ -394,6 +396,7 @@ abstract class ActiveModel::Model
       apply_defaults
     end
 
+    # Setters
     # Override the map json
     {% for name, opts in FIELDS %}
       # `{{name}}` setter
@@ -429,7 +432,10 @@ abstract class ActiveModel::Model
 
       # :nodoc:
       def initialize(%pull : ::JSON::PullParser, trusted = false)
+        # Calling initialize from JSON.mapping
         previous_def(%pull)
+
+        # Assign all non-mass-assign fields to nil
         if !trusted
           {% for name, opts in FIELDS %}
             {% if !opts[:mass_assign] %}
@@ -500,6 +506,7 @@ abstract class ActiveModel::Model
         self
       end
 
+      # Assign each field from JSON if field exists in JSON and has changed in model
       def assign_attributes_from_trusted_json(json)
         json = json.read_string(json.read_remaining) if json.responds_to? :read_remaining && json.responds_to? :read_string
         model = self.class.from_trusted_json(json)
@@ -590,14 +597,18 @@ abstract class ActiveModel::Model
       {% raise "`serialization_group` expected to be an Array(Symbol) | Symbol, got #{serialization_group.class_name}" %}
     {% end %}
 
+    # Assign instance variable to correct type
     @{{name.var}} : {{type_signature.id}}
 
     # `{{ name.var.id }}`'s default value
     def {{name.var.id}}_default : {{ name.type }}
+      # Check if name.value is not nil
       {% if name.value || name.value == false %}
         {{ name.value }}
+      # Type is not nilable
       {% elsif !resolved_type.nilable? %}
         raise NilAssertionError.new("No default for {{@type}}{{'#'.id}}{{name.var.id}}" )
+      # Type is nilable
       {% else %}
         nil
       {% end %}
@@ -632,7 +643,10 @@ abstract class ActiveModel::Model
         type_signature:      type_signature,
       }
     %}
+
     {% HAS_KEYS[0] = true %}
+
+    # Declare default values if name.value is not nil
     {% if name.value || name.value == false %}
       {% DEFAULTS[name.var.id] = name.value %}
     {% end %}
