@@ -624,7 +624,10 @@ abstract class ActiveModel::Model
     {% end %}
 
     # Assign instance variable to correct type
-    {% if opts[:converter] %} @[JSON::Field(converter: {{opts[:converter]}})] {% end %}
+    @[JSON::Field(
+      converter: {{ converter }},
+      ignore: {{ !persistence }},
+    )]
     @{{name.var}} : {{type_signature.id}}
 
     # `{{ name.var.id }}`'s default value
