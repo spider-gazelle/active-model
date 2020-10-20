@@ -228,14 +228,14 @@ describe ActiveModel::Model do
     end
 
     # Not Running
-    # it "should serialize/deserialize enum attributes" do
-    #   model = EnumAttributes.new(size: EnumAttributes::Size::Medium)
-    #   model_json = model.to_json
-    #   parsed_model = EnumAttributes.from_trusted_json(model_json)
-    #   parsed_model.product.should eq model.product
-    #   parsed_model.size.should eq model.size
-    #   parsed_model.attributes.should eq model.attributes
-    # end
+    it "should serialize/deserialize enum attributes" do
+      model = EnumAttributes.new(size: EnumAttributes::Size::Medium)
+      model_json = model.to_json
+      parsed_model = EnumAttributes.from_trusted_json(model_json)
+      parsed_model.product.should eq model.product
+      parsed_model.size.should eq model.size
+      parsed_model.attributes.should eq model.attributes
+    end
 
     # it "should serialize enum attributes to a concrete value" do
     #   model = EnumAttributes.new(size: EnumAttributes::Size::Medium)
