@@ -1,7 +1,6 @@
 require "http/params"
 require "json"
-require "json_mapping"
-# require "yaml"
+require "yaml"
 # require "yaml_mapping"
 require "http-params-serializable/ext"
 
@@ -519,15 +518,19 @@ abstract class ActiveModel::Model
 
     # Assign instance variable to correct type
 
-      @[JSON::Field(
-        {% if !persistence %}
-          ignore: true,
-        {% end %}
-        {% if !converter.nil? %}
-          converter: {{converter}}
-        {% end %}
-      )]
+    @[JSON::Field(
+      presence: true,
+      {% if !persistence %}
+        ignore: true,
+      {% end %}
+      {% if !converter.nil? %}
+        converter: {{converter}}
+      {% end %}
+    )]
     @{{name.var}} : {{type_signature.id}}
+
+    @[JSON::Field(ignore: true)]
+    getter? {{name.var}}_present : Bool = false
 
     # Attribute default value
     def {{name.var.id}}_default : {{ name.type }}
