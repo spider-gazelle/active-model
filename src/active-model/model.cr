@@ -88,8 +88,6 @@ abstract class ActiveModel::Model
       {% end %}
     {% end %}
 
-    # # NOTE: this can be moved into __map_json__ module because it is ok with JSON::Serializable
-    # # @[JSON::Field(ignore: true)]
     # Accessors for attributes without JSON mapping
     {% for name, opts in FIELDS %}
       {% unless opts[:should_persist] %}
@@ -292,7 +290,9 @@ abstract class ActiveModel::Model
       # {{name}} setter
       def {{name}}=(value : {{opts[:klass]}})
         if !@{{name}}_changed && @{{name}} != value
+          @[JSON::Field(ignore: true)]
           @{{name}}_changed = true
+
           @{{name}}_was = @{{name}}
         end
         {% if SETTERS[name] %}
@@ -342,10 +342,6 @@ abstract class ActiveModel::Model
     # Serialize from a trusted JSON source
     def self.from_trusted_json(string_or_io : String | IO) : self
       {{@type.name.id}}.new(__pull_for_json_serializable: ::JSON::PullParser.new(string_or_io), trusted: true)
-    end
-
-    def to_json
-      self.attributes.compact.to_json
     end
 
     # YAML.mapping(
@@ -522,9 +518,15 @@ abstract class ActiveModel::Model
     {% end %}
 
     # Assign instance variable to correct type
-    {% if !converter.nil? %}
-      @[JSON::Field(converter: {{converter}})]
-    {% end %}
+
+      @[JSON::Field(
+        {% if !persistence %}
+          ignore: true,
+        {% end %}
+        {% if !converter.nil? %}
+          converter: {{converter}}
+        {% end %}
+      )]
     @{{name.var}} : {{type_signature.id}}
 
     # Attribute default value
@@ -577,20 +579,3 @@ abstract class ActiveModel::Model
     {% end %}
   end
 end
-
-# super(string_or_io)
-# pp! "custom from_json method running"
-
-# # Assign all non-mass-assign fields to nil
-# if !trusted
-#   {% for name, opts in FIELDS %}
-#     {% if !opts[:mass_assign] %}
-#       @{{name}} = nil
-#     {% end %}
-#   {% end %}
-# end
-
-# apply_defaults
-# clear_changes_information
-
-# self

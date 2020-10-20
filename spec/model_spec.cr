@@ -337,10 +337,10 @@ describe ActiveModel::Model do
   describe "serialization" do
     it "should support to_json" do
       i = Inheritance.new
-      i.to_json.should eq "{\"boolean\":true,\"string\":\"hello\",\"integer\":45}"
+      JSON.parse(i.to_json).should eq JSON.parse("{\"boolean\":true,\"string\":\"hello\",\"integer\":45}")
 
       i.no_default = "test"
-      i.to_json.should eq "{\"boolean\":true,\"string\":\"hello\",\"integer\":45,\"no_default\":\"test\"}"
+      JSON.parse(i.to_json).should eq JSON.parse("{\"boolean\":true,\"string\":\"hello\",\"integer\":45,\"no_default\":\"test\"}")
     end
   end
 
@@ -550,22 +550,22 @@ describe ActiveModel::Model do
       end
 
       # Not Running
-      # it "should prevent json serialisation of non-persisted attributes" do
-      #   time = Time.utc
-      #   bob = "lob"
-      #   feeling = "free"
-      #   weird = "sauce"
+      it "should prevent json serialisation of non-persisted attributes" do
+        time = Time.utc
+        bob = "lob"
+        feeling = "free"
+        weird = "sauce"
 
-      #   model = AttributeOptions.new(time: time, bob: bob, feeling: feeling, weird: weird)
-      #   json = model.to_json
+        model = AttributeOptions.new(time: time, bob: bob, feeling: feeling, weird: weird)
+        json = model.to_json
 
-      #   # Should not serialize the non-persisted field
-      #   JSON.parse(json)["feeling"]?.should be_nil
+        # Should not serialize the non-persisted field
+        JSON.parse(json)["feeling"]?.should be_nil
 
-      #   # From json ignores the field
-      #   deserialised_model = AttributeOptions.from_trusted_json(json)
-      #   deserialised_model.feeling.should be_nil
-      # end
+        # From json ignores the field
+        deserialised_model = AttributeOptions.from_trusted_json(json)
+        deserialised_model.feeling.should be_nil
+      end
     end
   end
 end
