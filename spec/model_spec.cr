@@ -14,7 +14,6 @@ class BaseKlass < Abstract
   attribute no_default : String
 end
 
-# Not Running
 class AttributeOptions < ActiveModel::Model
   attribute time : Time, converter: Time::EpochConverter
   attribute bob : String = "Bobby", mass_assignment: false
@@ -99,7 +98,6 @@ describe ActiveModel::Model do
     end
 
     it "creates a new model from JSON" do
-      # bk = BaseKlass.from_json_new("{\"boolean\": false, \"integer\": 67}")
       bk = BaseKlass.from_json("{\"boolean\": false, \"integer\": 67}")
       bk.attributes.should eq({
         :string     => "hello",
@@ -403,16 +401,15 @@ describe ActiveModel::Model do
       klass.string.should eq "hello"
     end
 
-    # ERROR
     it "should serialise changes to json" do
-      # model = AttributeOptions.new(bob: "lob law")
-      # model.clear_changes_information
-      # new_time = Time.unix(100000)
-      # model.time = new_time
+      model = AttributeOptions.new(bob: "lob law")
+      model.clear_changes_information
+      new_time = Time.unix(100000)
+      model.time = new_time
 
-      # changes = JSON.parse(model.changed_json).as_h
-      # changes.keys.size.should eq 1
-      # changes["time"].should eq new_time.to_unix
+      changes = JSON.parse(model.changed_json).as_h
+      changes.keys.size.should eq 1
+      changes["time"].should eq new_time.to_unix
     end
 
     # it "should serialise changes to yaml" do
@@ -428,7 +425,6 @@ describe ActiveModel::Model do
   end
 
   describe "attribute options" do
-    # Not Running
     it "should convert values using json converters" do
       AttributeOptions.attributes.should eq [:time, :bob, :feeling, :weird]
       opts = AttributeOptions.from_json(%({"time": 1459859781, "bob": "Angus", "weird": 34}))
@@ -549,7 +545,6 @@ describe ActiveModel::Model do
         })
       end
 
-      # Not Running
       it "should prevent json serialisation of non-persisted attributes" do
         time = Time.utc
         bob = "lob"
