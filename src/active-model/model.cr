@@ -290,9 +290,6 @@ abstract class ActiveModel::Model
     # Setters
     {% for name, opts in FIELDS %}
       # {{name}} setter
-      {% if opts[:converter] %}
-        @[JSON::Field(converter: {{opts[:converter]}})]
-      {% end %}
       def {{name}}=(value : {{opts[:klass]}})
         if !@{{name}}_changed && @{{name}} != value
           @{{name}}_changed = true
@@ -525,6 +522,9 @@ abstract class ActiveModel::Model
     {% end %}
 
     # Assign instance variable to correct type
+    {% if !converter.nil? %}
+      @[JSON::Field(converter: {{converter}})]
+    {% end %}
     @{{name.var}} : {{type_signature.id}}
 
     # Attribute default value
