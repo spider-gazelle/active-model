@@ -323,21 +323,6 @@ abstract class ActiveModel::Model
       clear_changes_information
     end
 
-    def self.from_json_new(string_or_io : String | IO, trusted = false)
-      self.from_json(string_or_io)
-
-      # Assign all non-mass-assign fields to nil
-      if !trusted
-        {% for name, opts in FIELDS %}
-          {% if !opts[:mass_assign] %}
-            self.{{name}} = nil
-          {% end %}
-        {% end %}
-      end
-
-      self
-    end
-
     # Serialize from a trusted JSON source
     def self.from_trusted_json(string_or_io : String | IO) : self
       {{@type.name.id}}.new(__pull_for_json_serializable: ::JSON::PullParser.new(string_or_io), trusted: true)
