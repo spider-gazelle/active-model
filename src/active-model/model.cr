@@ -1,13 +1,13 @@
-require "http/params"
 require "json"
 require "yaml"
-# require "yaml_mapping"
-require "http-params-serializable/ext"
 
+require "http/params"
+require "http-params-serializable/ext"
 require "./http-params"
 
 abstract class ActiveModel::Model
   include JSON::Serializable
+  include YAML::Serializable
 
   # :nodoc:
   FIELD_MAPPINGS = {} of Nil => Nil
@@ -207,13 +207,13 @@ abstract class ActiveModel::Model
       all.to_json
     end
 
-    # def changed_yaml
-    #   all = JSON.parse(self.to_json).as_h
-    #   {% for name, index in FIELDS.keys %}
-    #     all.delete({{name.stringify}}) unless @{{name}}_changed
-    #   {% end %}
-    #   all.to_yaml
-    # end
+    def changed_yaml
+      all = JSON.parse(self.to_json).as_h
+      {% for name, index in FIELDS.keys %}
+        all.delete({{name.stringify}}) unless @{{name}}_changed
+      {% end %}
+      all.to_yaml
+    end
 
     def clear_changes_information
       {% if HAS_KEYS[0] %}
@@ -308,9 +308,7 @@ abstract class ActiveModel::Model
   # :nodoc:
   # Adds the from_json method
   macro __map_json__
-    def initialize(*, __pull_for_json_serializable pull : ::JSON::PullParser, trusted = false)
-      super(__pull_for_json_serializable: pull)
-
+    def after_initialize(trusted : Bool)
       if !trusted
         {% for name, opts in FIELDS %}
           {% if !opts[:mass_assign] %}
@@ -323,51 +321,23 @@ abstract class ActiveModel::Model
       clear_changes_information
     end
 
-    # Serialize from a trusted JSON source
-    def self.from_trusted_json(string_or_io : String | IO) : self
-      {{@type.name.id}}.new(__pull_for_json_serializable: ::JSON::PullParser.new(string_or_io), trusted: true)
+    def self.from_json(string_or_io : String | IO, trusted : Bool = false) : self
+      super(string_or_io).tap &.after_initialize(trusted: trusted)
     end
 
-    # YAML.mapping(
-    #   {% for name, opts in PERSIST %}
-    #     {% if opts[:converter] %}
-    #       {{name}}: { type: {{opts[:type_signature]}}, setter: false, converter: {{opts[:converter]}} },
-    #     {% else %}
-    #       {{name}}: { type: {{opts[:type_signature]}}, setter: false },
-    #     {% end %}
-    #   {% end %}
-    # )
+    # Serialize from a trusted JSON source
+    def self.from_trusted_json(string_or_io : String | IO) : self
+      self.from_json(string_or_io, trusted: true)
+    end
 
-    # # :nodoc:
-    # def initialize(%yaml : YAML::ParseContext, %node : ::YAML::Nodes::Node, _dummy : Nil, trusted = false)
-    #   previous_def(%yaml, %node, nil)
-    #   if !trusted
-    #     {% for name, opts in FIELDS %}
-    #       {% if !opts[:mass_assign] %}
-    #         @{{name}} = nil
-    #       {% end %}
-    #     {% end %}
-    #   end
-    #   apply_defaults
-    #   clear_changes_information
-    # end
+    def self.from_yaml(string_or_io : String | IO, trusted : Bool = false) : self
+      super(string_or_io).tap &.after_initialize(trusted: trusted)
+    end
 
-    # # Serialize from a trusted YAML source
-    # def self.from_trusted_yaml(string_or_io : String | IO) : self
-    #   ctx = YAML::ParseContext.new
-    #   node = begin
-    #     document = YAML::Nodes.parse(string_or_io)
-
-    #     # If the document is empty we simulate an empty scalar with
-    #     # plain style, that parses to Nil
-    #     document.nodes.first? || begin
-    #       scalar = YAML::Nodes::Scalar.new("")
-    #       scalar.style = YAML::ScalarStyle::PLAIN
-    #       scalar
-    #     end
-    #   end
-    #   {{@type.name.id}}.new(ctx, node, nil, true)
-    # end
+    # Serialize from a trusted YAML source
+    def self.from_trusted_yaml(string_or_io : String | IO) : self
+      self.from_yaml(string_or_io, trusted: true)
+    end
 
     def assign_attributes_from_json(json)
       json = json.read_string(json.read_remaining) if json.responds_to? :read_remaining && json.responds_to? :read_string
@@ -394,30 +364,30 @@ abstract class ActiveModel::Model
       self
     end
 
-    # # Uses the YAML parser as JSON is valid YAML
-    # def assign_attributes_from_yaml(yaml)
-    #   yaml = yaml.read_string(yaml.read_remaining) if yaml.responds_to? :read_remaining && yaml.responds_to? :read_string
-    #   model = self.class.from_yaml(yaml)
-    #   data = YAML.parse(yaml).as_h
-    #   {% for name, opts in FIELDS %}
-    #     {% if opts[:mass_assign] %}
-    #       self.{{name}} = model.{{name}} if data.has_key?({{name.stringify}}) && self.{{name}} != model.{{name}}
-    #     {% end %}
-    #   {% end %}
+    # Uses the YAML parser as JSON is valid YAML
+    def assign_attributes_from_yaml(yaml)
+      yaml = yaml.read_string(yaml.read_remaining) if yaml.responds_to? :read_remaining && yaml.responds_to? :read_string
+      model = self.class.from_yaml(yaml)
+      data = YAML.parse(yaml).as_h
+      {% for name, opts in FIELDS %}
+        {% if opts[:mass_assign] %}
+          self.{{name}} = model.{{name}} if data.has_key?({{name.stringify}}) && self.{{name}} != model.{{name}}
+        {% end %}
+      {% end %}
 
-    #   self
-    # end
+      self
+    end
 
-    # def assign_attributes_from_trusted_yaml(yaml)
-    #   yaml = yaml.read_string(yaml.read_remaining) if yaml.responds_to? :read_remaining && yaml.responds_to? :read_string
-    #   model = self.class.from_trusted_yaml(yaml)
-    #   data = YAML.parse(yaml).as_h
-    #   {% for name, opts in FIELDS %}
-    #     self.{{name}} = model.{{name}} if data.has_key?({{name.stringify}}) && self.{{name}} != model.{{name}}
-    #   {% end %}
+    def assign_attributes_from_trusted_yaml(yaml)
+      yaml = yaml.read_string(yaml.read_remaining) if yaml.responds_to? :read_remaining && yaml.responds_to? :read_string
+      model = self.class.from_trusted_yaml(yaml)
+      data = YAML.parse(yaml).as_h
+      {% for name, opts in FIELDS %}
+        self.{{name}} = model.{{name}} if data.has_key?({{name.stringify}}) && self.{{name}} != model.{{name}}
+      {% end %}
 
-    #   self
-    # end
+      self
+    end
   end
 
   macro __nilability_validation__
@@ -474,13 +444,13 @@ abstract class ActiveModel::Model
         json.{{json_type}}(value.{{serialise}})
       end
 
-      # def self.from_yaml(ctx : YAML::ParseContext, node : YAML::Nodes::Node) : {{enum_type}}
-      #   {{enum_type}}.new(ctx, node)
-      # end
+      def self.from_yaml(ctx : YAML::ParseContext, node : YAML::Nodes::Node) : {{enum_type}}
+        {{enum_type}}.new(ctx, node)
+      end
 
-      # def self.to_yaml(value : {{enum_type}}, yaml : YAML::Nodes::Builder)
-      #   yaml.scalar(value.{{serialise}})
-      # end
+      def self.to_yaml(value : {{enum_type}}, yaml : YAML::Nodes::Builder)
+        yaml.scalar(value.{{serialise}})
+      end
     end
 
     # Set an attribute with the converter
