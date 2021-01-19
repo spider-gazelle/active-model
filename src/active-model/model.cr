@@ -290,6 +290,7 @@ abstract class ActiveModel::Model
       def {{name}}=(value : {{opts[:klass]}})
         if !@{{name}}_changed && @{{name}} != value
           @[JSON::Field(ignore: true)]
+          @[YAML::Field(ignore: true)]
           @{{name}}_changed = true
 
           @{{name}}_was = @{{name}}
@@ -482,9 +483,19 @@ abstract class ActiveModel::Model
         converter: {{converter}}
       {% end %}
     )]
+    @[YAML::Field(
+      presence: true,
+      {% if !persistence %}
+        ignore: true,
+      {% end %}
+      {% if !converter.nil? %}
+        converter: {{converter}}
+      {% end %}
+    )]
     @{{name.var}} : {{type_signature.id}}
 
     @[JSON::Field(ignore: true)]
+    @[YAML::Field(ignore: true)]
     getter? {{name.var}}_present : Bool = false
 
     # Attribute default value
