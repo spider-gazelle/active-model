@@ -348,10 +348,10 @@ describe ActiveModel::Model do
   describe "serialization" do
     it "#to_json" do
       i = Inheritance.new
-      i.to_json.should eq "{\"boolean\":true,\"string\":\"hello\",\"integer\":45}"
+      JSON.parse(i.to_json).should eq JSON.parse("{\"boolean\":true,\"string\":\"hello\",\"integer\":45}")
 
       i.no_default = "test"
-      i.to_json.should eq "{\"boolean\":true,\"string\":\"hello\",\"integer\":45,\"no_default\":\"test\"}"
+      JSON.parse(i.to_json).should eq JSON.parse("{\"boolean\":true,\"string\":\"hello\",\"integer\":45,\"no_default\":\"test\"}")
     end
 
     m = SerializationGroups.new
