@@ -1,10 +1,12 @@
 name: active-model
-version: 2.1.0
+version: 2.2.0
 
 dependencies:
   http-params-serializable:
     github: vladfaust/http-params-serializable
     version: ~> 0.3
+  db:
+    github: crystal-lang/crystal-db
 
 development_dependencies:
   ameba:
