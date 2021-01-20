@@ -233,26 +233,22 @@ abstract class ActiveModel::Model
       modified
     end
 
-    {% for name, index in FIELDS.keys %}
-      def {{name}}_changed?
-        !!@{{name}}_changed
-      end
+    {% for name, opts in FIELDS %}
+      @[JSON::Field(ignore: true)]
+      @[YAML::Field(ignore: true)]
+      getter? {{name}}_changed  = false
 
       def {{name}}_will_change!
         @{{name}}_changed = true
         @{{name}}_was = @{{name}}.dup
       end
 
-      def {{name}}_was
-        @{{name}}_was
-      end
+      @[JSON::Field(ignore: true)]
+      @[YAML::Field(ignore: true)]
+      getter {{name}}_was : {{ opts[:klass] }} | Nil = nil
 
       def {{name}}_change
-        if @{{name}}_changed
-          {@{{name}}_was, @{{name}}}
-        else
-          nil
-        end
+        {@{{name}}_was, @{{name}}} if {{name}}_changed?
       end
     {% end %}
 
@@ -289,8 +285,6 @@ abstract class ActiveModel::Model
       # {{name}} setter
       def {{name}}=(value : {{opts[:klass]}})
         if !@{{name}}_changed && @{{name}} != value
-          @[JSON::Field(ignore: true)]
-          @[YAML::Field(ignore: true)]
           @{{name}}_changed = true
 
           @{{name}}_was = @{{name}}
