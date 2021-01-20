@@ -30,6 +30,12 @@ class SetterBlock < BaseKlass
   end
 end
 
+class Tag < Abstract
+  attribute json_tag : String?, tags: {json_emit_null: true}
+  attribute yaml_tag : String, tags: {yaml_key: "first_key"}
+  attribute json_yaml_tag : String?, tags: {yaml_emit_null: true, json_key: "second_key"}
+end
+
 class Inheritance < BaseKlass
   attribute boolean : Bool = true
 
@@ -127,7 +133,14 @@ describe ActiveModel::Model do
       opts.bob.should eq "Steve"
     end
 
-    pending "serialises correctly with tags" do
+    it "serialises correctly with tags" do
+      tg_1 = Tag.from_json({yaml_tag: "hello", second_key: "wassup"}.to_json)
+      tg_1.to_json.should eq("{\"json_tag\":null,\"yaml_tag\":\"hello\",\"second_key\":\"wassup\"}")
+      tg_1.to_yaml.should eq({first_key: "hello", json_yaml_tag: "wassup"}.to_yaml)
+
+      tg_2 = Tag.from_yaml({json_tag: "hi", first_key: "first_here"}.to_yaml)
+      tg_2.to_json.should eq("{\"json_tag\":\"hi\",\"yaml_tag\":\"first_here\"}")
+      tg_2.to_yaml.should eq("---\n" + "json_tag: hi\n" + "first_key: first_here\n" + "json_yaml_tag:\n")
     end
 
     it "uses named params for initialization" do
