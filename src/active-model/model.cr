@@ -577,12 +577,8 @@ abstract class ActiveModel::Model
     )]
     @[YAML::Field(
       presence: true,
-      {% if !persistence %}
-        ignore: true,
-      {% end %}
-      {% if !converter.nil? %}
-        converter: {{converter}}
-      {% end %}
+      converter: {{ converter }},
+      ignore: {{ !persistence }},
     )]
     @{{name.var}} : {{type_signature.id}}
 
@@ -595,9 +591,6 @@ abstract class ActiveModel::Model
       # Check if name.value is not nil
       {% if name.value || name.value == false %}
         {{ name.value }}
-      # Type is not nilable
-      {% elsif !resolved_type.nilable? %}
-        raise NilAssertionError.new("No default for {{@type}}{{'#'.id}}{{name.var.id}}" )
       # Type is nilable
       {% else %}
         nil
