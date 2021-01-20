@@ -261,14 +261,18 @@ abstract class ActiveModel::Model
   end
 
   # :nodoc:
+  struct None
+  end
+
+  # :nodoc:
   macro __create_initializer__
     def initialize(
       {% for name, opts in FIELDS %}
-        {{name}} : {{opts[:klass]}} | Nil = nil,
+        {{name}} : {{opts[:klass]}} | ::ActiveModel::Model::None = ::ActiveModel::Model::None.new,
       {% end %}
     )
       {% for name, opts in FIELDS %}
-        self.{{name}} = {{name}} unless {{name}}.nil?
+        self.{{name}} = {{name}} unless {{name}}.is_a? ::ActiveModel::Model::None
       {% end %}
 
       apply_defaults
