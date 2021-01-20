@@ -125,32 +125,8 @@ abstract class ActiveModel::Model
     {% end %}
 
     # Accessors for attributes without JSON mapping
-    # The following tags are possible
-    # JSON: key, emit_null, root
-    # YAML: key, emit_null
     {% for name, opts in FIELDS %}
       {% unless opts[:should_persist] %}
-        {% if opts[:tags] %}
-        @[JSON::Field(
-          {% if opts[:tags].has_key?(:json_key) %}
-            key: {{opts[:tags][:json_key]}},
-          {% end %}
-          {% if opts[:tags].has_key?(:json_emit_null) %}
-            emit_null: {{opts[:tags][:json_emit_null]}},
-          {% end %}
-          {% if opts[:tags].has_key?(:json_root) %}
-            root: {{opts[:tags][:json_root]}}
-          {% end %}
-        )]
-        @[YAML::Field(
-          {% if opts[:tags].has_key?(:yaml_key) %}
-            key: {{opts[:tags][:yaml_key]}},
-          {% end %}
-          {% if opts[:tags].has_key?(:yaml_emit_null) %}
-            emit_null: {{opts[:tags][:yaml_emit_null]}},
-          {% end %}
-        )]
-        {% end %}
         property {{ name }}
       {% end %}
     {% end %}
@@ -610,15 +586,34 @@ abstract class ActiveModel::Model
       {% raise "`serialization_group` expected to be an Array(Symbol) | Symbol, got #{serialization_group.class_name}" %}
     {% end %}
 
+    # Assign instance variable to correct type
+    # The following tags are possible
+    # JSON: key, emit_null, root
+    # YAML: key, emit_null
     @[JSON::Field(
       presence: true,
       converter: {{ converter }},
       ignore: {{ !persistence }},
+      {% if tags && tags[:json_key] %}
+        key: {{tags[:json_key]}},
+      {% end %}
+      {% if tags && tags[:json_emit_null] %}
+        emit_null: {{tags[:json_emit_null]}},
+      {% end %}
+      {% if tags && tags[:json_root] %}
+        root: {{tags[:json_root]}},
+      {% end %}
     )]
     @[YAML::Field(
       presence: true,
       converter: {{ converter }},
       ignore: {{ !persistence }},
+      {% if tags && tags[:yaml_key] %}
+        key: {{tags[:yaml_key]}},
+      {% end %}
+      {% if tags && tags[:yaml_emit_null] %}
+        emit_null: {{tags[:yaml_emit_null]}},
+      {% end %}
     )]
     @{{name.var}} : {{type_signature.id}}
 
