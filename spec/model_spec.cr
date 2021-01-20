@@ -140,7 +140,7 @@ describe ActiveModel::Model do
 
       tg_2 = Tag.from_yaml({json_tag: "hi", first_key: "first_here"}.to_yaml)
       tg_2.to_json.should eq("{\"json_tag\":\"hi\",\"yaml_tag\":\"first_here\"}")
-      tg_2.to_yaml.should eq("---\n" + "json_tag: hi\n" + "first_key: first_here\n" + "json_yaml_tag:\n")
+      tg_2.to_yaml.should eq({json_tag: "hi", first_key: "first_here", "json_yaml_tag": nil}.to_yaml)
     end
 
     it "uses named params for initialization" do

@@ -490,9 +490,6 @@ abstract class ActiveModel::Model
     {% end %}
 
     # Assign instance variable to correct type
-    # The following tags are possible
-    # JSON: key, emit_null, root
-    # YAML: key, emit_null
     @[JSON::Field(
       presence: true,
       {% if !persistence %}
