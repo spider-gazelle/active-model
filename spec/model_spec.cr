@@ -73,6 +73,15 @@ class Defaults < BaseKlass
   attribute false_default : Bool = false
 end
 
+class Human < ActiveModel::Model
+  attribute name : String
+  attribute age : Int32
+
+  def cool_name
+    {"Bill", "Jill"}.includes?(@name)
+  end
+end
+
 describe ActiveModel::Model do
   describe "class definitions" do
     it "should provide the list of attributes" do
@@ -585,6 +594,16 @@ describe ActiveModel::Model do
         deserialised_model = AttributeOptions.from_trusted_json(json)
         deserialised_model.feeling.should be_nil
       end
+    end
+  end
+
+  describe "extension" do
+    describe "#as_json" do
+      human = Human.new(name: "Jill", age: 33)
+
+      # Calls methods and merges results as fields into serialized JSON
+      human.as_json(except: [:age], methods: [:cool_name]).should eq("{\"name\":\"Jill\",\"cool_name\": true}")
+      human.as_json(only: [:age]).should eq(%("age": 33))
     end
   end
 end

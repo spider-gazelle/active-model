@@ -473,7 +473,7 @@ abstract class ActiveModel::Model
 
     def as_h(except : Array(Symbol), hash = {} of Nil => Nil)
       {% for ivar in @type.instance_vars %}
-        hash[{{ivar.name.stringify}}] = {{ivar}} if !only.includes?({{ivar.name.symbolize}})
+        hash[{{ivar.name.stringify}}] = {{ivar}} if !except.includes?({{ivar.name.symbolize}})
       {% end %}
       hash
     end
@@ -482,7 +482,7 @@ abstract class ActiveModel::Model
       {% for method in @type.methods %}
         {% if method.args.size == 0 %}
         if methods.includes?({{method.name.id.symbolize}})
-          hash[{{method.name.id.symbolize}}] = self.{{method.name.id}}
+          hash[{{method.name.id.stringify}}] = self.{{method.name.id}}
         end
         {% end %}
       {% end %}
@@ -494,7 +494,7 @@ abstract class ActiveModel::Model
     end
 
     def as_h(except : Array(Symbol), methods : Array(Symbol))
-      as_h(except: methods, hash: as_h(only))
+      as_h(except: methods, hash: as_h(except))
     end
 
     def as_json(only : Array(Symbol))
