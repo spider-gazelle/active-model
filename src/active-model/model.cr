@@ -124,6 +124,7 @@ abstract class ActiveModel::Model
       {% end %}
     {% end %}
 
+    # @[JSON::Field(key: true)]
     # Accessors for attributes without JSON mapping
     {% for name, opts in FIELDS %}
       {% unless opts[:should_persist] %}
@@ -454,9 +455,25 @@ abstract class ActiveModel::Model
       super(string_or_io).tap &.after_initialize(trusted: trusted)
     end
 
+    # Deserializes the given JSON in *string_or_io* into
+    # an instance of `self`, assuming the JSON consists
+    # of an JSON object with key *root*, and whose value is
+    # the value to deserialize.
+    #
+    # ```
+    # Int32.from_json(%({"main": 1}), root: "main") # => 1
+    # ```
+    def self.from_json(string_or_io : String | IO, root : String, trusted : Bool = false) : self
+      parser.on_key!(root) { self.from_json(string_or_io, trusted: trusted) }
+    end
+
     # Serialize from a trusted JSON source
     def self.from_trusted_json(string_or_io : String | IO) : self
       self.from_json(string_or_io, trusted: true)
+    end
+
+    def self.from_trusted_json(string_or_io : String | IO, root : String, trusted : Bool = false) : self
+      parser.on_key!(root) { self.from_trusted_json(string_or_io, trusted: trusted) }
     end
 
     def self.from_yaml(string_or_io : String | IO, trusted : Bool = false) : self
