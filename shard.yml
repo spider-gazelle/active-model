@@ -6,7 +6,8 @@ dependencies:
     github: vladfaust/http-params-serializable
     version: ~> 0.3
   db:
-    github: crystal-lang/crystal-db
+    github: dukeraphaelng/crystal-db
+    branch: fix/method_typo
 
 development_dependencies:
   ameba:
