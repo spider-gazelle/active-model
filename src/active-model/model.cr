@@ -497,18 +497,17 @@ abstract class ActiveModel::Model
     getter? {{name.var}}_present : Bool = false
 
     # Attribute default value
+    {% if resolved_type.nilable? %}
     def {{name.var.id}}_default : {{ name.type }}
       # Check if name.value is not nil
       {% if name.value || name.value == false %}
         {{ name.value }}
-      # Type is not nilable
-      {% elsif !resolved_type.nilable? %}
-        raise NilAssertionError.new("No default for {{@type}}{{'#'.id}}{{name.var.id}}" )
       # Type is nilable
       {% else %}
         nil
       {% end %}
     end
+    {% end %}
 
     {% if tags.empty? == true %}
       {% tags = nil %}
