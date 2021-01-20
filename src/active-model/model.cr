@@ -124,10 +124,33 @@ abstract class ActiveModel::Model
       {% end %}
     {% end %}
 
-    # @[JSON::Field(key: true)]
     # Accessors for attributes without JSON mapping
+    # The following tags are possible
+    # JSON: key, emit_null, root
+    # YAML: key, emit_null
     {% for name, opts in FIELDS %}
       {% unless opts[:should_persist] %}
+        {% if opts[:tags] %}
+        @[JSON::Field(
+          {% if opts[:tags].has_key?(:json_key) %}
+            key: {{opts[:tags][:json_key]}},
+          {% end %}
+          {% if opts[:tags].has_key?(:json_emit_null) %}
+            emit_null: {{opts[:tags][:json_emit_null]}},
+          {% end %}
+          {% if opts[:tags].has_key?(:json_root) %}
+            root: {{opts[:tags][:json_root]}}
+          {% end %}
+        )]
+        @[YAML::Field(
+          {% if opts[:tags].has_key?(:yaml_key) %}
+            key: {{opts[:tags][:yaml_key]}},
+          {% end %}
+          {% if opts[:tags].has_key?(:yaml_emit_null) %}
+            emit_null: {{opts[:tags][:yaml_emit_null]}},
+          {% end %}
+        )]
+        {% end %}
         property {{ name }}
       {% end %}
     {% end %}
@@ -464,7 +487,7 @@ abstract class ActiveModel::Model
     # Int32.from_json(%({"main": 1}), root: "main") # => 1
     # ```
     def self.from_json(string_or_io : String | IO, root : String, trusted : Bool = false) : self
-      parser.on_key!(root) { self.from_json(string_or_io, trusted: trusted) }
+      super(string_or_io, root).tap &.after_initialize(trusted: trusted)
     end
 
     # Serialize from a trusted JSON source
@@ -473,7 +496,7 @@ abstract class ActiveModel::Model
     end
 
     def self.from_trusted_json(string_or_io : String | IO, root : String, trusted : Bool = false) : self
-      parser.on_key!(root) { self.from_trusted_json(string_or_io, trusted: trusted) }
+      self.from_json(string_or_io, root, true)
     end
 
     def self.from_yaml(string_or_io : String | IO, trusted : Bool = false) : self

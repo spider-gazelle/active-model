@@ -127,6 +127,22 @@ describe ActiveModel::Model do
       })
     end
 
+    it "creates a new model from JSON with root params" do
+      bk = BaseKlass.from_json("{\"base\":{\"boolean\":false,\"integer\":67}}", root: "base")
+      bk.attributes.should eq({
+        :string     => "hello",
+        :integer    => 67,
+        :no_default => nil,
+      })
+
+      opts = AttributeOptions.from_trusted_json(%({"base":{"time": 1459859781, "bob": "Steve"}}), root: "base")
+      opts.time.should eq Time.unix(1459859781)
+      opts.bob.should eq "Steve"
+    end
+
+    pending "serialises correctly with tags" do
+    end
+
     it "uses named params for initialization" do
       bk = BaseKlass.new string: "bob", no_default: "jane"
       bk.attributes.should eq({
