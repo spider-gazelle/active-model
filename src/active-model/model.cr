@@ -54,6 +54,7 @@ abstract class ActiveModel::Model
       __getters__
       __nilability_validation__
       __map_json__
+      __extension__
       {% end %}
     end
   end
@@ -452,6 +453,69 @@ abstract class ActiveModel::Model
         end
       {% end %}
     {% end %}
+  end
+
+  macro __extension__
+    def to_h
+      hash = {} of Nil => Nil
+      {% for ivar in @type.instance_vars %}
+        hash[{{ivar.name.stringify}}] = {{ivar}}
+      {% end %}
+      hash
+    end
+
+    def as_h(only : Array(Symbol), hash = {} of Nil => Nil)
+      {% for ivar in @type.instance_vars %}
+        hash[{{ivar.name.stringify}}] = {{ivar}} if only.includes?({{ivar.name.symbolize}})
+      {% end %}
+      hash
+    end
+
+    def as_h(except : Array(Symbol), hash = {} of Nil => Nil)
+      {% for ivar in @type.instance_vars %}
+        hash[{{ivar.name.stringify}}] = {{ivar}} if !only.includes?({{ivar.name.symbolize}})
+      {% end %}
+      hash
+    end
+
+    def as_h(methods : Array(Symbol), hash = to_h)
+      {% for method in @type.methods %}
+        {% if method.args.size == 0 %}
+        if methods.includes?({{method.name.id.symbolize}})
+          hash[{{method.name.id.symbolize}}] = self.{{method.name.id}}
+        end
+        {% end %}
+      {% end %}
+      hash
+    end
+
+    def as_h(only : Array(Symbol), methods : Array(Symbol))
+      as_h(only: methods, hash: as_h(only))
+    end
+
+    def as_h(except : Array(Symbol), methods : Array(Symbol))
+      as_h(except: methods, hash: as_h(only))
+    end
+
+    def as_json(only : Array(Symbol))
+      as_h(only).to_json
+    end
+
+    def as_json(except : Array(Symbol))
+      as_h(except: except).to_json
+    end
+
+    def as_json(methods : Array(Symbol))
+      as_h(methods: methods).to_json
+    end
+
+    def as_json(only : Array(Symbol), methods : Array(Symbol))
+      as_h(only: only, methods: methods).to_json
+    end
+
+    def as_json(except : Array(Symbol), methods : Array(Symbol))
+      as_h(except: except, methods: methods).to_json
+    end
   end
 
   # Allow enum attributes. Persisted as either String | Int
