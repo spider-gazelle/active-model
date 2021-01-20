@@ -349,30 +349,24 @@ abstract class ActiveModel::Model
       modified
     end
 
-    {% for name, index in FIELDS.keys %}
-      # Check if `{{ name }}` is in the set of changed attributes.
-      def {{name}}_changed?
-        !!@{{name}}_changed
-      end
+    {% for name, opts in FIELDS %}
+      @[JSON::Field(ignore: true)]
+      @[YAML::Field(ignore: true)]
+      getter? {{name}}_changed  = false
 
       # Include `{{ name }}` in the set of changed attributes, whether it has changed or not.
-      def {{name}}_will_change!
+      def {{name}}_will_change! : Nil
         @{{name}}_changed = true
         @{{name}}_was = @{{name}}.dup
       end
 
-      # Returns the previous value of `{{ name }}`.
-      def {{name}}_was
-        @{{name}}_was
-      end
+      @[JSON::Field(ignore: true)]
+      @[YAML::Field(ignore: true)]
+      getter {{name}}_was : {{ opts[:klass] }} | Nil = nil
 
       # Returns `{ {{name}}_was, {{name}} }` if `{{name}}` has changed.
       def {{name}}_change
-        if @{{name}}_changed
-          {@{{name}}_was, @{{name}}}
-        else
-          nil
-        end
+        {@{{name}}_was, @{{name}}} if {{name}}_changed?
       end
     {% end %}
 
@@ -421,8 +415,6 @@ abstract class ActiveModel::Model
       # `{{name}}` setter
       def {{name}}=(value : {{opts[:klass]}})
         if !@{{name}}_changed && @{{name}} != value
-          @[JSON::Field(ignore: true)]
-          @[YAML::Field(ignore: true)]
           @{{name}}_changed = true
 
           @{{name}}_was = @{{name}}
