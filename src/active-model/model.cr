@@ -497,10 +497,34 @@ abstract class ActiveModel::Model
       self
     end
 
+    def assign_attributes_from_json(json, root : String)
+      json = json.read_string(json.read_remaining) if json.responds_to? :read_remaining && json.responds_to? :read_string
+      model = self.class.from_json(json, root: root)
+      data = JSON.parse(json).as_h
+      {% for name, opts in FIELDS %}
+        {% if opts[:mass_assign] %}
+          self.{{name}} = model.{{name}} if data.has_key?({{name.stringify}}) && self.{{name}} != model.{{name}}
+        {% end %}
+      {% end %}
+
+      self
+    end
+
     # Assign each field from JSON if field exists in JSON and has changed in model
     def assign_attributes_from_trusted_json(json)
       json = json.read_string(json.read_remaining) if json.responds_to? :read_remaining && json.responds_to? :read_string
       model = self.class.from_trusted_json(json)
+      data = JSON.parse(json).as_h
+      {% for name, opts in FIELDS %}
+        self.{{name}} = model.{{name}} if data.has_key?({{name.stringify}}) && self.{{name}} != model.{{name}}
+      {% end %}
+
+      self
+    end
+
+    def assign_attributes_from_trusted_json(json, root : String)
+      json = json.read_string(json.read_remaining) if json.responds_to? :read_remaining && json.responds_to? :read_string
+      model = self.class.from_trusted_json(json, root)
       data = JSON.parse(json).as_h
       {% for name, opts in FIELDS %}
         self.{{name}} = model.{{name}} if data.has_key?({{name.stringify}}) && self.{{name}} != model.{{name}}
