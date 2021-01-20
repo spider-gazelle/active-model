@@ -69,6 +69,11 @@ class Changes < BaseKlass
   attribute arr : Array(Int32) = [1, 2, 3]
 end
 
+class SimpleDBModel < Abstract
+  attribute c0 : Int32
+  attribute c1 : String
+end
+
 class Defaults < BaseKlass
   attribute false_default : Bool = false
 end
@@ -584,6 +589,19 @@ describe ActiveModel::Model do
         # From json ignores the field
         deserialised_model = AttributeOptions.from_trusted_json(json)
         deserialised_model.feeling.should be_nil
+      end
+    end
+  end
+
+  describe "DB::Serializable" do
+    with_dummy do |db|
+      db.query("1,a 2,b") do |rs|
+        objs = SimpleDBModel.from_rs(rs)
+        objs.size.should eq(2)
+        objs[0].c0.should eq(1)
+        objs[0].c1.should eq("a")
+        objs[1].c0.should eq(2)
+        objs[1].c1.should eq("b")
       end
     end
   end
