@@ -357,10 +357,9 @@ abstract class ActiveModel::Model
     def assign_attributes_from_json(json)
       json = json.read_string(json.read_remaining) if json.responds_to? :read_remaining && json.responds_to? :read_string
       model = self.class.from_json(json)
-      data = JSON.parse(json).as_h
       {% for name, opts in FIELDS %}
         {% if opts[:mass_assign] %}
-          self.{{name}} = model.{{name}} if data.has_key?({{name.stringify}}) && self.{{name}} != model.{{name}}
+          self.{{name}} = model.{{name}} if model.{{name.id}}_present? && self.{{name}} != model.{{name}}
         {% end %}
       {% end %}
 
@@ -370,10 +369,9 @@ abstract class ActiveModel::Model
     def assign_attributes_from_json(json, root : String)
       json = json.read_string(json.read_remaining) if json.responds_to? :read_remaining && json.responds_to? :read_string
       model = self.class.from_json(json, root: root)
-      data = JSON.parse(json).as_h
       {% for name, opts in FIELDS %}
         {% if opts[:mass_assign] %}
-          self.{{name}} = model.{{name}} if data.has_key?({{name.stringify}}) && self.{{name}} != model.{{name}}
+          self.{{name}} = model.{{name}} if model.{{name.id}}_present? && self.{{name}} != model.{{name}}
         {% end %}
       {% end %}
 
@@ -384,9 +382,8 @@ abstract class ActiveModel::Model
     def assign_attributes_from_trusted_json(json)
       json = json.read_string(json.read_remaining) if json.responds_to? :read_remaining && json.responds_to? :read_string
       model = self.class.from_trusted_json(json)
-      data = JSON.parse(json).as_h
       {% for name, opts in FIELDS %}
-        self.{{name}} = model.{{name}} if data.has_key?({{name.stringify}}) && self.{{name}} != model.{{name}}
+        self.{{name}} = model.{{name}} if model.{{name.id}}_present? && self.{{name}} != model.{{name}}
       {% end %}
 
       self
@@ -395,9 +392,8 @@ abstract class ActiveModel::Model
     def assign_attributes_from_trusted_json(json, root : String)
       json = json.read_string(json.read_remaining) if json.responds_to? :read_remaining && json.responds_to? :read_string
       model = self.class.from_trusted_json(json, root)
-      data = JSON.parse(json).as_h
       {% for name, opts in FIELDS %}
-        self.{{name}} = model.{{name}} if data.has_key?({{name.stringify}}) && self.{{name}} != model.{{name}}
+        self.{{name}} = model.{{name}} if model.{{name.id}}_present? && self.{{name}} != model.{{name}}
       {% end %}
 
       self
@@ -410,7 +406,7 @@ abstract class ActiveModel::Model
       data = YAML.parse(yaml).as_h
       {% for name, opts in FIELDS %}
         {% if opts[:mass_assign] %}
-          self.{{name}} = model.{{name}} if data.has_key?({{name.stringify}}) && self.{{name}} != model.{{name}}
+          self.{{name}} = model.{{name}} if model.{{name.id}}_present? && self.{{name}} != model.{{name}}
         {% end %}
       {% end %}
 
@@ -422,7 +418,7 @@ abstract class ActiveModel::Model
       model = self.class.from_trusted_yaml(yaml)
       data = YAML.parse(yaml).as_h
       {% for name, opts in FIELDS %}
-        self.{{name}} = model.{{name}} if data.has_key?({{name.stringify}}) && self.{{name}} != model.{{name}}
+        self.{{name}} = model.{{name}} if model.{{name.id}}_present? && self.{{name}} != model.{{name}}
       {% end %}
 
       self
