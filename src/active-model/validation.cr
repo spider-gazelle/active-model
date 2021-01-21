@@ -1,6 +1,8 @@
 require "./error"
 
 module ActiveModel::Validation
+  @[JSON::Field(ignore: true)]
+  @[YAML::Field(ignore: true)]
   getter errors = [] of Error
 
   macro included
