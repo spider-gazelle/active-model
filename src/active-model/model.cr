@@ -327,10 +327,16 @@ abstract class ActiveModel::Model
     # Deserializes the given JSON in *string_or_io* into
     # an instance of `self`, assuming the JSON consists
     # of an JSON object with key *root*, and whose value is
-    # the value to deserialize.
+    # the value to deserialize. Will not deserialise from
+    # fields with mass_assign: false
     #
     # ```
-    # Int32.from_json(%({"main": 1}), root: "main") # => 1
+    # class User < ActiveModel::Model
+    #   attribute name : String
+    #   attribute google_id : UUID, mass_assign: false
+    # end
+    #
+    # User.from_json(%({"main": {"name": "Jason", "google_id": "f6f70bfb-c882-446d-8758-7ce47db39620"}}), root: "main") # => #<User:0x103131b20 @name="Jason">
     # ```
     def self.from_json(string_or_io : String | IO, root : String, trusted : Bool = false) : self
       super(string_or_io, root).tap &.after_initialize(trusted: trusted)
