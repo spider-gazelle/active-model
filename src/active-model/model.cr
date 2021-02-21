@@ -16,17 +16,6 @@ abstract class ActiveModel::Model
     extend self
   end
 
-  # Stub methods to prevent compiler errors
-  def apply_defaults; end
-
-  def changed?; end
-
-  def clear_changes_information; end
-
-  def changed_attributes; end
-
-  protected def validation_error; end
-
   macro inherited
     # Macro level constants
 
@@ -52,10 +41,10 @@ abstract class ActiveModel::Model
       __customize_orm__
       {% unless @type.abstract? %}
       __track_changes__
+      __map_json__
       __create_initializer__
       __getters__
       __nilability_validation__
-      __map_json__
       {% end %}
     end
   end
