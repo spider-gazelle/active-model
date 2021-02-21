@@ -3,8 +3,8 @@ version: 2.1.0
 
 dependencies:
   http-params-serializable:
-    github: vladfaust/http-params-serializable
-    version: ~> 0.3
+    github: caspiano/http-params-serializable
+    branch: chore/0.36.0
 
 development_dependencies:
   ameba:
