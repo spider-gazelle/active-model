@@ -364,8 +364,9 @@ abstract class ActiveModel::Model
 
       getter {{name}}_was : {{ opts[:klass] }} | Nil = nil
 
-      # Returns `{ {{name}}_was, {{name}} }` if `{{name}}` has changed.
-      def {{name}}_change
+      # Returns a Tuple of the previous and the current
+      # value of an instance variable if it has changed
+      def {{name}}_change : Tuple({{opts[:klass]}}?, {{opts[:klass]}}?)?
         {@{{name}}_was, @{{name}}} if {{name}}_changed?
       end
     {% end %}
