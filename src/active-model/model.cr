@@ -144,7 +144,7 @@ abstract class ActiveModel::Model
       } {% if PERSIST.empty? %} of Nil => Nil {% end %}
     end
 
-    # Deserialize from JSON if value is available in the payload
+    # Bulk assign attributes
     def assign_attributes(
       {% for name, opts in FIELDS %}
         {{name.id}} : {{opts[:klass]}} | Missing = Missing,
