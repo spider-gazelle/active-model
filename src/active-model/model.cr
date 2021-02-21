@@ -187,6 +187,8 @@ abstract class ActiveModel::Model
     # Define instance variable types
     {% if HAS_KEYS[0] %}
       {% for name, opts in FIELDS %}
+        @[JSON::Field(ignore: true)]
+        @[YAML::Field(ignore: true)]
         @{{name}}_was : {{opts[:klass]}} | Nil
       {% end %}
     {% end %}
@@ -243,8 +245,6 @@ abstract class ActiveModel::Model
         @{{name}}_was = @{{name}}.dup
       end
 
-      @[JSON::Field(ignore: true)]
-      @[YAML::Field(ignore: true)]
       getter {{name}}_was : {{ opts[:klass] }} | Nil = nil
 
       def {{name}}_change
