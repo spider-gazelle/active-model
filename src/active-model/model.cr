@@ -106,7 +106,7 @@ abstract class ActiveModel::Model
       {% end %}
     end
 
-    # # Methods that return attributes
+    # Methods that return attributes
 
     # Returns a Hash of all the attribute values
     def attributes
