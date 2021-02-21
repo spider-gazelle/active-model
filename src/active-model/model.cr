@@ -496,10 +496,26 @@ abstract class ActiveModel::Model
     {% end %}
   end
 
-  # Declare attributes in real model
-  # The following tags are possible
-  # JSON: key, emit_null, root
-  # YAML: key, emit_null
+  # Declare an `ActiveModel::Model` attribute
+  #
+  # # General Arguments
+  #
+  # - `persistence`: Will not emit the key when serializing if `false`.
+  # - `converter`: A module defining alternative serialisation behaviour for the attribute's value.
+  #
+  # # Serialisation Target Arguments
+  #
+  # Additionally, `attribute` accepts the following optional arguments for different serialisation targets.
+  #
+  # ## JSON
+  # - `json_key`: Override the emitted JSON key.
+  # - `json_emit_null`: Emit `null` if value is `nil`, key is omitted if `json_emit_null` is `false`.
+  # - `json_root`: Assume value is inside a JSON object under the provided key.
+  # ## YAML
+  # - `yaml_key`: Override the emitted YAML key.
+  # - `yaml_emit_null`: Emit `null` if value is `nil`, key is omitted if `yaml_emit_null` is `false`.
+  # - `yaml_root`: Assume value is inside a YAMLk object under the provided key.
+  #
   macro attribute(name, converter = nil, mass_assignment = true, persistence = true, **tags, &block)
     # Declaring correct type of attribute
     {% resolved_type = name.type.resolve %}
