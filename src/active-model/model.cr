@@ -573,7 +573,7 @@ abstract class ActiveModel::Model
     @[YAML::Field(ignore: true)]
     getter? {{name.var}}_present : Bool = false
 
-    # Attribute default value
+    # Attribute {{name.var.id}} default value
     {% if resolved_type.nilable? %}
     def {{name.var.id}}_default : {{ name.type }}
       # Check if name.value is not nil
