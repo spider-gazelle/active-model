@@ -139,7 +139,7 @@ module ActiveModel::Validation
 
     {% if confirmation %}
       {% for field, index in fields %}
-        {% type = @type.instance_vars.select { |ivar| ivar.name == field.id }.map(&.type)[0] %}
+        {% type = @type.instance_vars.select(&.name.==(field.id)).map(&.type)[0] %}
 
         # Using attribute for named params support
         attribute {{field.id}}_confirmation : {{FIELDS[field.id][:klass]}}, persistence: false

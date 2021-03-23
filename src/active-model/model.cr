@@ -472,11 +472,7 @@ abstract class ActiveModel::Model
 
     class {{ converter }}
       def self.from_json(value : JSON::PullParser) : {{enum_type}}
-        {% if column_type_str == "Int32" %}
-          {{enum_type}}.from_value(value.read_int)
-        {% else %}
-          {{enum_type}}.new(value)
-        {% end %}
+        {{enum_type}}.new(value)
       end
 
       def self.to_json(value : {{enum_type}}, json : JSON::Builder)
