@@ -31,10 +31,8 @@ p.attributes # => {:name => "Bob Jane", :age => 32}
 
 The `attribute` macro takes two parameters. The field name with type and an optional default value.
 
-#### `enum_attributes`
-
-Allows type safe enum defined attributes.<br>
-Same signature as `attribute` with an optional parameter `column_type` to specify the serialisation of the enum member to either String or Int32, default is Int32.
+You can also define enum attributes!<br>
+The default serialisation for enums is to a downcased string. Use [`Enum::ValueConverter(T)`](https://crystal-lang.org/api/latest/Enum/ValueConverter.html) if you want to serialise to the value backing members of the enum.
 
 ```ruby
 require "active-model"
@@ -45,7 +43,7 @@ class Order < ActiveModel::Model
    Burger
   end
 
-  enum_attribute product : Product = Product::Fries, column_type: String
+  attribute product : Product = Product::Fries
 end
 ```
 

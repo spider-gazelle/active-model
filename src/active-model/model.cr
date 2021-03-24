@@ -454,48 +454,6 @@ abstract class ActiveModel::Model
     {% end %}
   end
 
-  # Allow enum attributes. Persisted as either String | Int
-  macro enum_attribute(name, column_type = Int32, mass_assignment = true, persistence = true, **tags)
-    {% column_type_str = column_type.stringify %}
-    {{ raise("enum_attribute: column_type must be (Int32 | String).class, given #{column_type_str}") unless column_type_str == "Int32" || column_type_str == "String" }}
-
-    {% if column_type_str == "Int32" %}
-      {% serialise = :to_i.id %}
-      {% json_type = :number.id %}
-    {% else %}
-      {% serialise = :to_s.id %}
-      {% json_type = :string.id %}
-    {% end %}
-
-    {% enum_type = name.type.resolve %}
-    {% converter = (enum_type.stringify + "Converter").id %}
-
-    class {{ converter }}
-      def self.from_json(value : JSON::PullParser) : {{enum_type}}
-        {{enum_type}}.new(value)
-      end
-
-      def self.to_json(value : {{enum_type}}, json : JSON::Builder)
-        json.{{json_type}}(value.{{serialise}})
-      end
-
-      def self.from_yaml(ctx : YAML::ParseContext, node : YAML::Nodes::Node) : {{enum_type}}
-        {{enum_type}}.new(ctx, node)
-      end
-
-      def self.to_yaml(value : {{enum_type}}, yaml : YAML::Nodes::Builder)
-        yaml.scalar(value.{{serialise}})
-      end
-    end
-
-    # Set an attribute with the converter
-    {% if name.value || name.value == false %}
-        attribute {{ name.var }} : {{ enum_type }} = {{ name.value }}, mass_assignment: {{mass_assignment}}, persistence: {{persistence}}, converter: {{ converter }} {% if !tags.empty? %}, tags: {{tags}} {% end %}
-    {% else %}
-        attribute {{ name.var }} : {{ enum_type }}, mass_assignment: {{mass_assignment}}, persistence: {{persistence}}, converter: {{ converter }} {% if !tags.empty? %}, tags: {{tags}} {% end %}
-    {% end %}
-  end
-
   macro attribute(name, converter = nil, mass_assignment = true, persistence = true, **tags, &block)
     {% resolved_type = name.type.resolve %}
     {% if resolved_type.nilable? %}
