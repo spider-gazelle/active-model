@@ -61,7 +61,7 @@ class EnumAttributes < ActiveModel::Model
     Fries
   end
 
-  attribute size : Size, converter: Enum::ValueConverter(Size), custom_tag: "what what"
+  attribute size : Size, converter: Enum::ValueConverter(::EnumAttributes::Size), custom_tag: "what what"
   attribute product : Product = Product::Fries
 end
 
