@@ -462,68 +462,6 @@ abstract class ActiveModel::Model
     {% end %}
   end
 
-  # Allow enum attributes. Persisted as either String | Int
-  macro enum_attribute(name, column_type = Int32, mass_assignment = true, persistence = true, **tags)
-    {% column_type_str = column_type.stringify %}
-    {{ raise("enum_attribute: column_type must be (Int32 | String).class, given #{column_type_str}") unless column_type_str == "Int32" || column_type_str == "String" }}
-
-    {% if column_type_str == "Int32" %}
-      {% serialise = :to_i.id %}
-      {% json_type = :number.id %}
-    {% else %}
-      {% serialise = :to_s.id %}
-      {% json_type = :string.id %}
-    {% end %}
-
-    {% enum_type = name.type.resolve %}
-    {% converter = (enum_type.stringify + "Converter").id %}
-
-    class {{ converter }}
-      def self.from_json(value : JSON::PullParser) : {{enum_type}}
-        {{enum_type}}.new(value)
-      end
-
-      def self.to_json(value : {{enum_type}}, json : JSON::Builder)
-        json.{{json_type}}(value.{{serialise}})
-      end
-
-      def self.from_yaml(ctx : YAML::ParseContext, node : YAML::Nodes::Node) : {{enum_type}}
-        {{enum_type}}.new(ctx, node)
-      end
-
-      def self.to_yaml(value : {{enum_type}}, yaml : YAML::Nodes::Builder)
-        yaml.scalar(value.{{serialise}})
-      end
-    end
-
-    # Set an attribute with the converter
-    {% if name.value || name.value == false %}
-        attribute {{ name.var }} : {{ enum_type }} = {{ name.value }}, mass_assignment: {{mass_assignment}}, persistence: {{persistence}}, converter: {{ converter }} {% if !tags.empty? %}, tags: {{tags}} {% end %}
-    {% else %}
-        attribute {{ name.var }} : {{ enum_type }}, mass_assignment: {{mass_assignment}}, persistence: {{persistence}}, converter: {{ converter }} {% if !tags.empty? %}, tags: {{tags}} {% end %}
-    {% end %}
-  end
-
-  # Declare an `ActiveModel::Model` attribute
-  #
-  # # General Arguments
-  #
-  # - `persistence`: Will not emit the key when serializing if `false`.
-  # - `converter`: A module defining alternative serialisation behaviour for the attribute's value.
-  #
-  # # Serialisation Target Arguments
-  #
-  # Additionally, `attribute` accepts the following optional arguments for different serialisation targets.
-  #
-  # ## JSON
-  # - `json_key`: Override the emitted JSON key.
-  # - `json_emit_null`: Emit `null` if value is `nil`, key is omitted if `json_emit_null` is `false`.
-  # - `json_root`: Assume value is inside a JSON object under the provided key.
-  # ## YAML
-  # - `yaml_key`: Override the emitted YAML key.
-  # - `yaml_emit_null`: Emit `null` if value is `nil`, key is omitted if `yaml_emit_null` is `false`.
-  # - `yaml_root`: Assume value is inside a YAMLk object under the provided key.
-  #
   macro attribute(name, converter = nil, mass_assignment = true, persistence = true, **tags, &block)
     # Declaring correct type of attribute
     {% resolved_type = name.type.resolve %}

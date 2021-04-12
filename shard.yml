@@ -1,5 +1,6 @@
 name: active-model
-version: 2.1.0
+version: 4.0.0
+crystal: ">= 1.0.0"
 
 dependencies:
   http-params-serializable:

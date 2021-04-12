@@ -61,8 +61,8 @@ class EnumAttributes < ActiveModel::Model
     Fries
   end
 
-  enum_attribute size : Size, column_type: Int32, custom_tag: "what what"
-  enum_attribute product : Product = Product::Fries, column_type: String
+  attribute size : Size, converter: Enum::ValueConverter(Size), custom_tag: "what what"
+  attribute product : Product = Product::Fries
 end
 
 class Changes < BaseKlass
@@ -243,7 +243,7 @@ describe ActiveModel::Model do
     end
   end
 
-  describe "enum_attributes" do
+  describe "enum attributes" do
     it "should allow enums as attributes" do
       model = EnumAttributes.new(size: EnumAttributes::Size::Medium)
       model.size.should eq EnumAttributes::Size::Medium
@@ -266,7 +266,7 @@ describe ActiveModel::Model do
       yaml = YAML.parse(model.to_yaml)
 
       yaml["size"].should eq EnumAttributes::Size::Medium.to_i
-      json["product"].should eq EnumAttributes::Product::Fries.to_s
+      json["product"].should eq EnumAttributes::Product::Fries.to_s.downcase
     end
 
     it "tracks changes to enum attributes" do
