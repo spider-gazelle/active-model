@@ -93,6 +93,47 @@ abstract class ActiveModel::Model
       {% end %}
     {% end %}
 
+    # Generate serializers for each mentioned serialization group
+    {% serialization_groups = FIELDS.values.reduce([] of String) { |groups, opts| opts[:tags] && opts[:tags][:serialization_groups] && opts[:tags][:serialization_groups].each { |g| groups << g }; groups } %}
+    {% for serialization_group in serialization_groups.uniq %}
+
+    # Serialize attributes with `{{ serialization_group }}` in its `serialization_groups` option
+    def to_{{ serialization_group.id }}_json(json : ::JSON::Builder)
+      json.object do
+        {% for kv in FIELDS.to_a.select { |(_n, o)| o[:tags] && o[:tags][:serialization_groups] && o[:tags][:serialization_groups].includes?(serialization_group) } %}
+          {% name = kv[0] %}
+          {% opts = kv[1] %}
+          %value = @{{name}}
+          json.field({{ name.stringify }}) do
+            {% if opts[:converter] %}
+              if !%value.nil?
+                {{ opts[:converter] }}.to_json(%value, json)
+              else
+                nil.to_json(json)
+              end
+            {% else %}
+              %value.to_json(json)
+            {% end %}
+          end
+        {% end %}
+      end
+    end
+
+    # :ditto:
+    def to_{{ serialization_group.id }}_json : String
+      String.build do |string|
+        to_{{ serialization_group.id }}_json string
+      end
+    end
+
+    # :ditto:
+    def to_{{ serialization_group.id }}_json(io : IO) : Nil
+      JSON.build(io) do |json|
+        to_{{ serialization_group.id }}_json json
+      end
+    end
+    {% end %}
+
     # Generate code to apply default values
     def apply_defaults
       super

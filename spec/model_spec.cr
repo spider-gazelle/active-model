@@ -30,6 +30,12 @@ class SetterBlock < BaseKlass
   end
 end
 
+class SerializationGroups < BaseKlass
+  attribute everywhere : String = "hi", serialization_groups: [:admin, :user, :public]
+  attribute joined : Int64 = 0, serialization_groups: [:admin, :user]
+  attribute mates : Int64 = 0, serialization_groups: [:user]
+end
+
 class Inheritance < BaseKlass
   attribute boolean : Bool = true
 
@@ -333,12 +339,21 @@ describe ActiveModel::Model do
   end
 
   describe "serialization" do
-    it "should support to_json" do
+    it "#to_json" do
       i = Inheritance.new
       i.to_json.should eq "{\"boolean\":true,\"string\":\"hello\",\"integer\":45}"
 
       i.no_default = "test"
       i.to_json.should eq "{\"boolean\":true,\"string\":\"hello\",\"integer\":45,\"no_default\":\"test\"}"
+    end
+  end
+
+  describe "`serialization_groups` option" do
+    it "generates serializers" do
+      m = SerializationGroups.new
+      m.to_admin_json.should eq ({everywhere: m.everywhere, joined: m.joined}).to_json
+      m.to_user_json.should eq ({everywhere: m.everywhere, joined: m.joined, mates: m.mates}).to_json
+      m.to_public_json.should eq ({everywhere: m.everywhere}).to_json
     end
   end
 
