@@ -105,7 +105,7 @@ abstract class ActiveModel::Model
       {% end %}
     end
 
-    # Returns a Hash of all the attribute values
+    # Returns a `Hash` of all attribute values
     def attributes
       {
         {% for name, index in FIELDS.keys %}
@@ -114,7 +114,7 @@ abstract class ActiveModel::Model
       } {% if !HAS_KEYS[0] %} of Nil => Nil {% end %}
     end
 
-    # Returns a NamedTuple of all attribute values
+    # Returns a `NamedTuple` of all attribute values.
     def attributes_tuple
       {
         {% for name, index in FIELDS.keys %}
@@ -123,16 +123,16 @@ abstract class ActiveModel::Model
       } {% if !HAS_KEYS[0] %} of Nil => Nil {% end %}
     end
 
-    # You may want a list of available attributes
-    def self.attributes
+    # Returns all attribute keys.
+    def self.attributes : Array(Symbol)
       [
         {% for name, index in FIELDS.keys %}
           :{{name.id}},
         {% end %}
-      ] {% if !HAS_KEYS[0] %} of Nil {% end %}
+      ] {% if !HAS_KEYS[0] %} of Symbol {% end %}
     end
 
-    # Returns a hash of all attributes that may be persisted
+    # Returns a `Hash` of all attributes that can be persisted.
     def persistent_attributes
       {
         {% for name, opts in PERSIST %}
@@ -141,6 +141,7 @@ abstract class ActiveModel::Model
       } {% if PERSIST.empty? %} of Nil => Nil {% end %}
     end
 
+    # Assign to multiple attributes.
     def assign_attributes(
       {% for name, opts in FIELDS %}
         {{name.id}} : {{opts[:klass]}} | Missing = Missing,
@@ -153,7 +154,7 @@ abstract class ActiveModel::Model
       {% end %}
     end
 
-    # Accept HTTP params
+    # Assign to mulitple attributes via `HTTP::Params`.
     def assign_attributes(params : HTTP::Params | Hash(String, String) | Tuple(String, String))
       __from_object_params__(params)
 
@@ -187,6 +188,7 @@ abstract class ActiveModel::Model
       {% end %}
     {% end %}
 
+    # Returns a `Hash` with all changed attributes.
     def changed_attributes
       all = attributes
       {% for name, index in FIELDS.keys %}
@@ -195,32 +197,39 @@ abstract class ActiveModel::Model
       all
     end
 
-    def changed_json
+    # Serialize the set of changed attributes to JSON.
+    def changed_json : String
+      String.build do |string|
+        changed_json string
+      end
+    end
+
+    # :ditto:
+    def changed_json(io : IO) : Nil
       all = JSON.parse(self.to_json).as_h
       {% for name, index in FIELDS.keys %}
         all.delete({{name.stringify}}) unless @{{name}}_changed
       {% end %}
-      all.to_json
+      all.to_json(io)
     end
 
-    def changed_yaml
+    # Serialize the set of changed attributes to YAML.
+    def changed_yaml : String
+      String.build do |string|
+        changed_yaml string
+      end
+    end
+
+    # :ditto:
+    def changed_yaml(io : IO) : Nil
       all = JSON.parse(self.to_json).as_h
       {% for name, index in FIELDS.keys %}
         all.delete({{name.stringify}}) unless @{{name}}_changed
       {% end %}
-      all.to_yaml
+      all.to_yaml(io)
     end
 
-    def clear_changes_information
-      {% if HAS_KEYS[0] %}
-        {% for name, index in FIELDS.keys %}
-          @{{name}}_changed = false
-          @{{name}}_was = nil
-        {% end %}
-      {% end %}
-      nil
-    end
-
+    # Check if any attributes have changed.
     def changed?
       modified = false
       {% for name, index in FIELDS.keys %}
@@ -230,19 +239,23 @@ abstract class ActiveModel::Model
     end
 
     {% for name, index in FIELDS.keys %}
+      # Check if `{{ name }}` is in the set of changed attributes.
       def {{name}}_changed?
         !!@{{name}}_changed
       end
 
+      # Include `{{ name }}` in the set of changed attributes, whether it has changed or not.
       def {{name}}_will_change!
         @{{name}}_changed = true
         @{{name}}_was = @{{name}}.dup
       end
 
+      # Returns the previous value of `{{ name }}`.
       def {{name}}_was
         @{{name}}_was
       end
 
+      # Returns `{ {{name}}_was, {{name}} }` if `{{name}}` has changed.
       def {{name}}_change
         if @{{name}}_changed
           {@{{name}}_was, @{{name}}}
@@ -252,11 +265,23 @@ abstract class ActiveModel::Model
       end
     {% end %}
 
+    # Reset each attribute to their previous values and clears all changes.
     def restore_attributes
       {% for name, index in FIELDS.keys %}
         @{{name}} = @{{name}}_was if @{{name}}_changed
       {% end %}
       clear_changes_information
+    end
+
+    # Reset changes for all attributes.
+    def clear_changes_information
+      {% if HAS_KEYS[0] %}
+        {% for name, index in FIELDS.keys %}
+          @{{name}}_changed = false
+          @{{name}}_was = nil
+        {% end %}
+      {% end %}
+      nil
     end
   end
 
@@ -274,7 +299,7 @@ abstract class ActiveModel::Model
       apply_defaults
     end
 
-    # Accept HTTP params
+    # Initialize {{ @type }} from `HTTP::Params`.
     def initialize(params : HTTP::Params | Hash(String, String) | Tuple(String, String))
       __from_object_params__(params)
       apply_defaults
@@ -282,7 +307,7 @@ abstract class ActiveModel::Model
 
     # Override the map json
     {% for name, opts in FIELDS %}
-      # {{name}} setter
+      # `{{name}}` setter
       def {{name}}=(value : {{opts[:klass]}})
         if !@{{name}}_changed && @{{name}} != value
           @{{name}}_changed = true
@@ -426,6 +451,7 @@ abstract class ActiveModel::Model
   end
 
   macro __nilability_validation__
+    # Validate that all non-nillable fields have values.
     def validate_nilability
       {% if HAS_KEYS[0] && !PERSIST.empty? %}
         {% for name, opts in PERSIST %}
@@ -440,8 +466,8 @@ abstract class ActiveModel::Model
   macro __getters__
     {% if HAS_KEYS[0] && !PERSIST.empty? %}
       {% for name, opts in PERSIST %}
-        # {{name}} getter
-        def {{name}}
+        # `{{name}}` getter
+        def {{name}} : {{opts[:klass]}}
           {% if opts[:klass].nilable? %}
             @{{name.id}}
           {% else %}
@@ -464,7 +490,7 @@ abstract class ActiveModel::Model
 
     @{{name.var}} : {{type_signature.id}}
 
-    # Attribute default value
+    # `{{ name.var.id }}`'s default value
     def {{name.var.id}}_default : {{ name.type }}
       {% if name.value || name.value == false %}
         {{ name.value }}
