@@ -129,9 +129,12 @@ abstract class ActiveModel::Model
       def to_{{ serialization_group.id }}_json(json : ::JSON::Builder)
         json.object do
           # Serialize attributes
-          {% for kv in FIELDS.to_a.select do |(_n, o)|
-                         o[:serialization_group] && o[:serialization_group].includes?(serialization_group)
-                       end %}
+          {%
+            in_group = FIELDS.to_a.select do |(_n, o)|
+              o[:serialization_group] && o[:serialization_group].includes?(serialization_group)
+            end
+          %}
+          {% for kv in in_group %}
             {% name = kv[0] %}
             {% opts = kv[1] %}
             %value = @{{name}}
