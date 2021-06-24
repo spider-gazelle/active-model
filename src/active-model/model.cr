@@ -67,8 +67,8 @@ abstract class ActiveModel::Model
     {% group_members = group_members.reject { |m| except.includes? m } unless except.empty? %}
     {% for member in group_members.map(&.id) %}
       {% if LOCAL_FIELDS[member] && FIELDS[member] %}
-        {% LOCAL_FIELDS[member][:serialization_groups] << group unless LOCAL_FIELDS[member][:serialization_groups].includes? group %}
-        {% FIELDS[member][:serialization_groups] << group unless FIELDS[member][:serialization_groups].includes? group %}
+        {% LOCAL_FIELDS[member][:serialization_group] << group unless LOCAL_FIELDS[member][:serialization_group].includes? group %}
+        {% FIELDS[member][:serialization_group] << group unless FIELDS[member][:serialization_group].includes? group %}
       {% end %}
     {% end %}
   end
@@ -111,20 +111,20 @@ abstract class ActiveModel::Model
 
     # Generate serializers for each mentioned serialization group
     {%
-      serialization_groups = FIELDS.values.reduce([] of String) do |groups, opts|
-        opts[:serialization_groups] && opts[:serialization_groups].each do |g|
+      serialization_group = FIELDS.values.reduce([] of String) do |groups, opts|
+        opts[:serialization_group] && opts[:serialization_group].each do |g|
           groups << g
         end
         groups
       end.uniq
     %}
 
-    {% for serialization_group in serialization_groups %}
-      # Serialize attributes with `{{ serialization_group }}` in its `serialization_groups` option
+    {% for serialization_group in serialization_group %}
+      # Serialize attributes with `{{ serialization_group }}` in its `serialization_group` option
       def to_{{ serialization_group.id }}_json(json : ::JSON::Builder)
         json.object do
           {% for kv in FIELDS.to_a.select do |(_n, o)|
-                         o[:serialization_groups] && o[:serialization_groups].includes?(serialization_group)
+                         o[:serialization_group] && o[:serialization_group].includes?(serialization_group)
                        end %}
             {% name = kv[0] %}
             {% opts = kv[1] %}
@@ -551,7 +551,7 @@ abstract class ActiveModel::Model
     converter = nil,
     mass_assignment = true,
     persistence = true,
-    serialization_groups = [] of Symbol,
+    serialization_group = [] of Symbol,
     **tags,
     &block
   )
@@ -562,9 +562,9 @@ abstract class ActiveModel::Model
       {% type_signature = "#{resolved_type} | Nil".id %}
     {% end %}
 
-    {% serialization_groups = [serialization_groups] if serialization_groups.is_a?(SymbolLiteral) %}
-    {% unless serialization_groups.is_a? ArrayLiteral && serialization_groups.all? &.is_a?(SymbolLiteral) %}
-      {% raise "`serialization_groups` expected to be an Array(Symbol) | Symbol, got #{serialization_groups.class_name}" %}
+    {% serialization_group = [serialization_group] if serialization_group.is_a?(SymbolLiteral) %}
+    {% unless serialization_group.is_a? ArrayLiteral && serialization_group.all? &.is_a?(SymbolLiteral) %}
+      {% raise "`serialization_group` expected to be an Array(Symbol) | Symbol, got #{serialization_group.class_name}" %}
     {% end %}
 
     @{{name.var}} : {{type_signature.id}}
@@ -588,25 +588,25 @@ abstract class ActiveModel::Model
 
     {%
       LOCAL_FIELDS[name.var.id] = {
-        klass:                resolved_type,
-        converter:            converter,
-        mass_assign:          mass_assignment,
-        should_persist:       persistence,
-        serialization_groups: serialization_groups,
-        tags:                 tags,
-        type_signature:       type_signature,
+        klass:               resolved_type,
+        converter:           converter,
+        mass_assign:         mass_assignment,
+        should_persist:      persistence,
+        serialization_group: serialization_group,
+        tags:                tags,
+        type_signature:      type_signature,
       }
     %}
 
     {%
       FIELDS[name.var.id] = {
-        klass:                resolved_type,
-        converter:            converter,
-        mass_assign:          mass_assignment,
-        should_persist:       persistence,
-        serialization_groups: serialization_groups,
-        tags:                 tags,
-        type_signature:       type_signature,
+        klass:               resolved_type,
+        converter:           converter,
+        mass_assign:         mass_assignment,
+        should_persist:      persistence,
+        serialization_group: serialization_group,
+        tags:                tags,
+        type_signature:      type_signature,
       }
     %}
     {% HAS_KEYS[0] = true %}

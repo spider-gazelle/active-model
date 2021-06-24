@@ -31,12 +31,13 @@ class SetterBlock < BaseKlass
 end
 
 class SerializationGroups < BaseKlass
-  attribute everywhere : String = "hi", serialization_groups: [:admin, :user, :public]
-  attribute joined : Int64 = 0, serialization_groups: [:admin, :user]
-  attribute mates : Int64 = 0, serialization_groups: [:user]
+  attribute everywhere : String = "hi", serialization_group: [:admin, :user, :public]
+  attribute joined : Int64 = 0, serialization_group: [:admin, :user]
+  attribute mates : Int64 = 0, serialization_group: :user
+  attribute another : String = "ok"
 
-  subset_json :some, only: [:joined]
-  subset_json :most, except: [:everywhere]
+  subset_json :some, only: [:joined, :another]
+  subset_json :most, except: :everywhere
 end
 
 class Inheritance < BaseKlass
@@ -352,7 +353,7 @@ describe ActiveModel::Model do
 
     m = SerializationGroups.new
 
-    it "`serialization_groups` optio ngenerates serializers" do
+    it "`serialization_group` optio ngenerates serializers" do
       m.to_admin_json.should eq ({everywhere: m.everywhere, joined: m.joined}).to_json
       m.to_user_json.should eq ({everywhere: m.everywhere, joined: m.joined, mates: m.mates}).to_json
       m.to_public_json.should eq ({everywhere: m.everywhere}).to_json
@@ -360,11 +361,11 @@ describe ActiveModel::Model do
 
     describe "subset_json" do
       it "selects for attributes in `only`" do
-        m.to_some_json.should eq ({joined: m.joined}).to_json
+        m.to_some_json.should eq ({joined: m.joined, another: m.another}).to_json
       end
 
       it "rejects attributes in `except`" do
-        m.to_most_json.should eq ({joined: m.joined, mates: m.mates}).to_json
+        m.to_most_json.should eq ({joined: m.joined, mates: m.mates, another: m.another}).to_json
       end
     end
   end
