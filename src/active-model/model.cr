@@ -30,6 +30,8 @@ abstract class ActiveModel::Model
     PERSIST = {} of Nil => Nil
     # :nodoc:
     SETTERS = {} of Nil => Nil
+    # :nodoc:
+    GROUP_METHODS = {} of Symbol => Nil
 
     # Process attributes must be called while constants are in scope
 
@@ -57,11 +59,13 @@ abstract class ActiveModel::Model
 
   protected def validation_error; end
 
-  macro define_to_json(group, except = [] of Symbol, only = [] of Symbol)
+  macro define_to_json(group, except = [] of Symbol, only = [] of Symbol, methods = [] of Symbol)
     {% only = [only] if only.is_a?(SymbolLiteral) %}
     {% except = [except] if except.is_a?(SymbolLiteral) %}
+    {% methods = [methods] if methods.is_a?(SymbolLiteral) %}
     {% raise "expected `except` to be an Array(Symbol) | Symbol, got #{except.class_name}" unless except.is_a? ArrayLiteral && except.all? &.is_a?(SymbolLiteral) %}
     {% raise "expected `only` to be an Array(Symbol) | Symbol, got #{only.class_name}" unless only.is_a? ArrayLiteral && only.all? &.is_a?(SymbolLiteral) %}
+    {% raise "expected `methods` to be an Array(Symbol) | Symbol, got #{methods.class_name}" unless methods.is_a? ArrayLiteral && methods.all? &.is_a?(SymbolLiteral) %}
     {% group_members = LOCAL_FIELDS.keys.map(&.symbolize) %}
     {% group_members = group_members.select { |m| only.includes? m } unless only.empty? %}
     {% group_members = group_members.reject { |m| except.includes? m } unless except.empty? %}
@@ -71,6 +75,7 @@ abstract class ActiveModel::Model
         {% FIELDS[member][:serialization_group] << group unless FIELDS[member][:serialization_group].includes? group %}
       {% end %}
     {% end %}
+    {% GROUP_METHODS[group] = methods %}
   end
 
   # :nodoc:
@@ -123,6 +128,7 @@ abstract class ActiveModel::Model
       # Serialize attributes with `{{ serialization_group }}` in its `serialization_group` option
       def to_{{ serialization_group.id }}_json(json : ::JSON::Builder)
         json.object do
+          # Serialize attributes
           {% for kv in FIELDS.to_a.select do |(_n, o)|
                          o[:serialization_group] && o[:serialization_group].includes?(serialization_group)
                        end %}
@@ -140,6 +146,15 @@ abstract class ActiveModel::Model
                 %value.to_json(json)
               {% end %}
             end
+          {% end %}
+          # Serialize method calls
+          {% if GROUP_METHODS[serialization_group] %}
+            {% for method in GROUP_METHODS[serialization_group] %}
+              %method_result = self.{{ method.id }}
+              json.field({{ method.id.stringify }}) do
+                %method_result.to_json(json)
+              end
+            {% end %}
           {% end %}
         end
       end
