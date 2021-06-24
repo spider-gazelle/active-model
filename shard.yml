@@ -1,6 +1,7 @@
 name: active-model
-version: 3.1.0
+version: 3.1.1
 crystal: ">= 1.0.0"
+license: MIT
 
 dependencies:
   http-params-serializable:
@@ -13,10 +14,8 @@ dependencies:
 
 development_dependencies:
   ameba:
-    github: veelenga/ameba
+    github: crystal-ameba/ameba
 
 authors:
   - Stephen von Takach <steve@place.tech>
   - Caspian Baska <caspian@place.tech>
-
-license: MIT

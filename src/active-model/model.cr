@@ -60,12 +60,17 @@ abstract class ActiveModel::Model
   protected def validation_error; end
 
   macro define_to_json(group, except = [] of Symbol, only = [] of Symbol, methods = [] of Symbol)
+    {% only = only.resolve if only.is_a?(Path) %}
+    {% except = except.resolve if except.is_a?(Path) %}
+    {% methods = methods.resolve if methods.is_a?(Path) %}
     {% only = [only] if only.is_a?(SymbolLiteral) %}
     {% except = [except] if except.is_a?(SymbolLiteral) %}
     {% methods = [methods] if methods.is_a?(SymbolLiteral) %}
+
     {% raise "expected `except` to be an Array(Symbol) | Symbol, got #{except.class_name}" unless except.is_a? ArrayLiteral && except.all? &.is_a?(SymbolLiteral) %}
     {% raise "expected `only` to be an Array(Symbol) | Symbol, got #{only.class_name}" unless only.is_a? ArrayLiteral && only.all? &.is_a?(SymbolLiteral) %}
     {% raise "expected `methods` to be an Array(Symbol) | Symbol, got #{methods.class_name}" unless methods.is_a? ArrayLiteral && methods.all? &.is_a?(SymbolLiteral) %}
+
     {% group_members = LOCAL_FIELDS.keys.map(&.symbolize) %}
     {% group_members = group_members.select { |m| only.includes? m } unless only.empty? %}
     {% group_members = group_members.reject { |m| except.includes? m } unless except.empty? %}
