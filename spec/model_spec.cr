@@ -38,6 +38,9 @@ class SerializationGroups < BaseKlass
 
   define_to_json :some, only: [:joined, :another]
   define_to_json :most, except: :everywhere
+  define_to_json :with_method, only: :joined, methods: :foo
+
+  getter foo = "foo"
 end
 
 class Inheritance < BaseKlass
@@ -366,6 +369,10 @@ describe ActiveModel::Model do
 
       it "rejects attributes in `except`" do
         m.to_most_json.should eq ({joined: m.joined, mates: m.mates, another: m.another}).to_json
+      end
+
+      it "includes methods via `methods`" do
+        m.to_with_method_json.should eq ({joined: m.joined, foo: m.foo}).to_json
       end
     end
   end

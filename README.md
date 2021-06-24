@@ -134,7 +134,7 @@ end
 The `serialization_group` argument to `attribute` accepts an `Array(Symbol)` or `Symbol`.
 This will include the attribute in a generated serializer, `#to_<group>_json`.
 
-The `define_to_json` macro allows for defining subset serializations via `only` and `except` arguments.
+The `define_to_json` macro allows for defining subset serializations via `only` and `except` arguments. The `methods` argument allows for inclusion of instance methods in the serializer.
 
 ```crystal
 require "active-model"
@@ -147,6 +147,9 @@ class SerializationGroups < ActiveModel::Model
 
   define_to_json :some, only: [:joined, :another]
   define_to_json :most, except: :everywhere
+  define_to_json :method, only: :joined, methods: :foo
+
+  getter foo = "foo"
 end
 
 m = SerializationGroups.new
@@ -155,4 +158,5 @@ m.to_admin_json  # {"everywhere":"hi","joined":0}
 m.to_user_json   # {"everywhere":"hi","joined":0,"mates":1}
 m.to_some_json   # {"joined":0,"another":"ok"}
 m.to_most_json   # {"joined":0,"mates":0,"another":"ok"}
+m.to_method_json # {"joined":0,"foo":"foo"}
 ```
