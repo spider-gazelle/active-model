@@ -34,6 +34,9 @@ class SerializationGroups < BaseKlass
   attribute everywhere : String = "hi", serialization_groups: [:admin, :user, :public]
   attribute joined : Int64 = 0, serialization_groups: [:admin, :user]
   attribute mates : Int64 = 0, serialization_groups: [:user]
+
+  subset_json :some, only: [:joined]
+  subset_json :most, except: [:everywhere]
 end
 
 class Inheritance < BaseKlass
@@ -346,14 +349,23 @@ describe ActiveModel::Model do
       i.no_default = "test"
       i.to_json.should eq "{\"boolean\":true,\"string\":\"hello\",\"integer\":45,\"no_default\":\"test\"}"
     end
-  end
 
-  describe "`serialization_groups` option" do
-    it "generates serializers" do
-      m = SerializationGroups.new
+    m = SerializationGroups.new
+
+    it "`serialization_groups` optio ngenerates serializers" do
       m.to_admin_json.should eq ({everywhere: m.everywhere, joined: m.joined}).to_json
       m.to_user_json.should eq ({everywhere: m.everywhere, joined: m.joined, mates: m.mates}).to_json
       m.to_public_json.should eq ({everywhere: m.everywhere}).to_json
+    end
+
+    describe "subset_json" do
+      it "selects for attributes in `only`" do
+        m.to_some_json.should eq ({joined: m.joined}).to_json
+      end
+
+      it "rejects attributes in `except`" do
+        m.to_most_json.should eq ({joined: m.joined, mates: m.mates}).to_json
+      end
     end
   end
 

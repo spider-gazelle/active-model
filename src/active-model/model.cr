@@ -57,6 +57,22 @@ abstract class ActiveModel::Model
 
   protected def validation_error; end
 
+  macro subset_json(group, except = [] of Symbol, only = [] of Symbol)
+    {% only = [only] if only.is_a?(SymbolLiteral) %}
+    {% except = [except] if except.is_a?(SymbolLiteral) %}
+    {% raise "expected `except` to be an Array(Symbol) | Symbol, got #{except.class_name}" unless except.is_a? ArrayLiteral && except.all? &.is_a?(SymbolLiteral) %}
+    {% raise "expected `only` to be an Array(Symbol) | Symbol, got #{only.class_name}" unless only.is_a? ArrayLiteral && only.all? &.is_a?(SymbolLiteral) %}
+    {% group_members = LOCAL_FIELDS.keys.map(&.symbolize) %}
+    {% group_members = group_members.select { |m| only.includes? m } unless only.empty? %}
+    {% group_members = group_members.reject { |m| except.includes? m } unless except.empty? %}
+    {% for member in group_members.map(&.id) %}
+      {% if LOCAL_FIELDS[member] && FIELDS[member] %}
+        {% LOCAL_FIELDS[member][:serialization_groups] << group unless LOCAL_FIELDS[member][:serialization_groups].includes? group %}
+        {% FIELDS[member][:serialization_groups] << group unless FIELDS[member][:serialization_groups].includes? group %}
+      {% end %}
+    {% end %}
+  end
+
   # :nodoc:
   macro __process_attributes__
     {% klasses = @type.ancestors %}
@@ -94,44 +110,53 @@ abstract class ActiveModel::Model
     {% end %}
 
     # Generate serializers for each mentioned serialization group
-    {% serialization_groups = FIELDS.values.reduce([] of String) { |groups, opts| opts[:tags] && opts[:tags][:serialization_groups] && opts[:tags][:serialization_groups].each { |g| groups << g }; groups } %}
-    {% for serialization_group in serialization_groups.uniq %}
+    {%
+      serialization_groups = FIELDS.values.reduce([] of String) do |groups, opts|
+        opts[:serialization_groups] && opts[:serialization_groups].each do |g|
+          groups << g
+        end
+        groups
+      end.uniq
+    %}
 
-    # Serialize attributes with `{{ serialization_group }}` in its `serialization_groups` option
-    def to_{{ serialization_group.id }}_json(json : ::JSON::Builder)
-      json.object do
-        {% for kv in FIELDS.to_a.select { |(_n, o)| o[:tags] && o[:tags][:serialization_groups] && o[:tags][:serialization_groups].includes?(serialization_group) } %}
-          {% name = kv[0] %}
-          {% opts = kv[1] %}
-          %value = @{{name}}
-          json.field({{ name.stringify }}) do
-            {% if opts[:converter] %}
-              if !%value.nil?
-                {{ opts[:converter] }}.to_json(%value, json)
-              else
-                nil.to_json(json)
-              end
-            {% else %}
-              %value.to_json(json)
-            {% end %}
-          end
-        {% end %}
+    {% for serialization_group in serialization_groups %}
+      # Serialize attributes with `{{ serialization_group }}` in its `serialization_groups` option
+      def to_{{ serialization_group.id }}_json(json : ::JSON::Builder)
+        json.object do
+          {% for kv in FIELDS.to_a.select do |(_n, o)|
+                         o[:serialization_groups] && o[:serialization_groups].includes?(serialization_group)
+                       end %}
+            {% name = kv[0] %}
+            {% opts = kv[1] %}
+            %value = @{{name}}
+            json.field({{ name.stringify }}) do
+              {% if opts[:converter] %}
+                if !%value.nil?
+                  {{ opts[:converter] }}.to_json(%value, json)
+                else
+                  nil.to_json(json)
+                end
+              {% else %}
+                %value.to_json(json)
+              {% end %}
+            end
+          {% end %}
+        end
       end
-    end
 
-    # :ditto:
-    def to_{{ serialization_group.id }}_json : String
-      String.build do |string|
-        to_{{ serialization_group.id }}_json string
+      # :ditto:
+      def to_{{ serialization_group.id }}_json : String
+        String.build do |string|
+          to_{{ serialization_group.id }}_json string
+        end
       end
-    end
 
-    # :ditto:
-    def to_{{ serialization_group.id }}_json(io : IO) : Nil
-      JSON.build(io) do |json|
-        to_{{ serialization_group.id }}_json json
+      # :ditto:
+      def to_{{ serialization_group.id }}_json(io : IO) : Nil
+        JSON.build(io) do |json|
+          to_{{ serialization_group.id }}_json json
+        end
       end
-    end
     {% end %}
 
     # Generate code to apply default values
@@ -521,12 +546,25 @@ abstract class ActiveModel::Model
     {% end %}
   end
 
-  macro attribute(name, converter = nil, mass_assignment = true, persistence = true, **tags, &block)
+  macro attribute(
+    name,
+    converter = nil,
+    mass_assignment = true,
+    persistence = true,
+    serialization_groups = [] of Symbol,
+    **tags,
+    &block
+  )
     {% resolved_type = name.type.resolve %}
     {% if resolved_type.nilable? %}
       {% type_signature = resolved_type %}
     {% else %}
       {% type_signature = "#{resolved_type} | Nil".id %}
+    {% end %}
+
+    {% serialization_groups = [serialization_groups] if serialization_groups.is_a?(SymbolLiteral) %}
+    {% unless serialization_groups.is_a? ArrayLiteral && serialization_groups.all? &.is_a?(SymbolLiteral) %}
+      {% raise "`serialization_groups` expected to be an Array(Symbol) | Symbol, got #{serialization_groups.class_name}" %}
     {% end %}
 
     @{{name.var}} : {{type_signature.id}}
@@ -550,23 +588,25 @@ abstract class ActiveModel::Model
 
     {%
       LOCAL_FIELDS[name.var.id] = {
-        klass:          resolved_type,
-        converter:      converter,
-        mass_assign:    mass_assignment,
-        should_persist: persistence,
-        tags:           tags,
-        type_signature: type_signature,
+        klass:                resolved_type,
+        converter:            converter,
+        mass_assign:          mass_assignment,
+        should_persist:       persistence,
+        serialization_groups: serialization_groups,
+        tags:                 tags,
+        type_signature:       type_signature,
       }
     %}
 
     {%
       FIELDS[name.var.id] = {
-        klass:          resolved_type,
-        converter:      converter,
-        mass_assign:    mass_assignment,
-        should_persist: persistence,
-        tags:           tags,
-        type_signature: type_signature,
+        klass:                resolved_type,
+        converter:            converter,
+        mass_assign:          mass_assignment,
+        should_persist:       persistence,
+        serialization_groups: serialization_groups,
+        tags:                 tags,
+        type_signature:       type_signature,
       }
     %}
     {% HAS_KEYS[0] = true %}
