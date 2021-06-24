@@ -128,3 +128,31 @@ class Person < ActiveModel::Model
   end
 end
 ```
+
+#### Serialization
+
+The `serialization_group` argument to `attribute` accepts an `Array(Symbol)` or `Symbol`.
+This will include the attribute in a generated serializer, `#to_<group>_json`.
+
+The `define_to_json` macro allows for defining subset serializations via `only` and `except` arguments.
+
+```crystal
+require "active-model"
+
+class SerializationGroups < ActiveModel::Model
+  attribute everywhere : String = "hi", serialization_group: [:admin, :user, :public]
+  attribute joined : Int64 = 0, serialization_group: [:admin, :user]
+  attribute mates : Int64 = 0, serialization_group: :user
+  attribute another : String = "ok"
+
+  define_to_json :some, only: [:joined, :another]
+  define_to_json :most, except: :everywhere
+end
+
+m = SerializationGroups.new
+m.to_public_json # {"everywhere":"hi"}
+m.to_admin_json  # {"everywhere":"hi","joined":0}
+m.to_user_json   # {"everywhere":"hi","joined":0,"mates":1}
+m.to_some_json   # {"joined":0,"another":"ok"}
+m.to_most_json   # {"joined":0,"mates":0,"another":"ok"}
+```
