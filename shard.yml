@@ -1,11 +1,11 @@
 name: active-model
-version: 3.0.0
+version: 3.1.0
 crystal: ">= 1.0.0"
 
 dependencies:
   http-params-serializable:
-    github: caspiano/http-params-serializable
-    branch: chore/0.36.0
+    github: place-labs/http-params-serializable
+    version: ~> 0.5
   json_mapping:
     github: crystal-lang/json_mapping.cr
   yaml_mapping:
