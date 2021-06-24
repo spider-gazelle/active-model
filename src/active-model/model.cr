@@ -57,7 +57,7 @@ abstract class ActiveModel::Model
 
   protected def validation_error; end
 
-  macro subset_json(group, except = [] of Symbol, only = [] of Symbol)
+  macro define_to_json(group, except = [] of Symbol, only = [] of Symbol)
     {% only = [only] if only.is_a?(SymbolLiteral) %}
     {% except = [except] if except.is_a?(SymbolLiteral) %}
     {% raise "expected `except` to be an Array(Symbol) | Symbol, got #{except.class_name}" unless except.is_a? ArrayLiteral && except.all? &.is_a?(SymbolLiteral) %}

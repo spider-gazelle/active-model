@@ -36,8 +36,8 @@ class SerializationGroups < BaseKlass
   attribute mates : Int64 = 0, serialization_group: :user
   attribute another : String = "ok"
 
-  subset_json :some, only: [:joined, :another]
-  subset_json :most, except: :everywhere
+  define_to_json :some, only: [:joined, :another]
+  define_to_json :most, except: :everywhere
 end
 
 class Inheritance < BaseKlass
@@ -359,7 +359,7 @@ describe ActiveModel::Model do
       m.to_public_json.should eq ({everywhere: m.everywhere}).to_json
     end
 
-    describe "subset_json" do
+    describe "define_to_json" do
       it "selects for attributes in `only`" do
         m.to_some_json.should eq ({joined: m.joined, another: m.another}).to_json
       end
