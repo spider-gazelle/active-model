@@ -628,26 +628,16 @@ abstract class ActiveModel::Model
       presence: true,
       converter: {{ converter }},
       ignore: {{ !persistence }},
-      {% if tags && tags[:json_key] %}
-        key: {{tags[:json_key]}},
-      {% end %}
-      {% if tags && tags[:json_emit_null] %}
-        emit_null: {{tags[:json_emit_null]}},
-      {% end %}
-      {% if tags && tags[:json_root] %}
-        root: {{tags[:json_root]}},
-      {% end %}
+      key: {{tags[:json_key]}},
+      emit_null: {{tags[:json_emit_null]}},
+      root: {{tags[:json_root]}},
     )]
     @[YAML::Field(
       presence: true,
       converter: {{ converter }},
       ignore: {{ !persistence }},
-      {% if tags && tags[:yaml_key] %}
-        key: {{tags[:yaml_key]}},
-      {% end %}
-      {% if tags && tags[:yaml_emit_null] %}
-        emit_null: {{tags[:yaml_emit_null]}},
-      {% end %}
+      key: {{tags[:yaml_key]}},
+      emit_null: {{tags[:yaml_emit_null]}},
     )]
     @{{name.var}} : {{type_signature.id}}
 
