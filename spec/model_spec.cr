@@ -279,7 +279,7 @@ describe ActiveModel::Model do
       yaml = YAML.parse(model.to_yaml)
 
       yaml["size"].should eq EnumAttributes::Size::Medium.to_i
-      json["product"].should eq EnumAttributes::Product::Fries.to_s
+      json["product"].should eq EnumAttributes::Product::Fries.to_s.downcase
     end
 
     it "tracks changes to enum attributes" do
