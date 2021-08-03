@@ -351,6 +351,8 @@ abstract class ActiveModel::Model
         @{{name}}_was = @{{name}}.dup
       end
 
+      @[JSON::Field(ignore: true)]
+      @[YAML::Field(ignore: true)]
       getter {{name}}_was : {{ opts[:klass] }} | Nil = nil
 
       # Returns a Tuple of the previous and the current
