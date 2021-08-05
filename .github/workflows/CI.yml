@@ -33,7 +33,7 @@ jobs:
           - crystal: nightly
             stable: false
     steps:
-      - uses: oprypin/install-crystal@v1
+      - uses: crystal-lang/install-crystal@v1
         with:
           crystal: ${{ matrix.crystal }}
       - uses: actions/checkout@v2
