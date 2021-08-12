@@ -39,6 +39,7 @@ abstract class ActiveModel::Model
     macro finished
       __process_attributes__
       __customize_orm__
+      __track_local_fields__
       {% unless @type.abstract? %}
       __track_changes__
       __map_json__
@@ -270,16 +271,32 @@ abstract class ActiveModel::Model
   end
 
   # :nodoc:
-  macro __track_changes__
-    # Define instance variable types
-    {% if HAS_KEYS[0] %}
-      {% for name, opts in FIELDS %}
-        @[JSON::Field(ignore: true)]
-        @[YAML::Field(ignore: true)]
-        @{{name}}_was : {{opts[:klass]}} | Nil
-      {% end %}
-    {% end %}
+  macro __track_local_fields__
+    {% for name, opts in LOCAL_FIELDS %}
+      @[JSON::Field(ignore: true)]
+      @[YAML::Field(ignore: true)]
+      getter? {{name}}_changed  = false
 
+      # Include `{{ name }}` in the set of changed attributes, whether it has changed or not.
+      def {{name}}_will_change! : Nil
+        @{{name}}_changed = true
+        @{{name}}_was = @{{name}}.dup
+      end
+
+      @[JSON::Field(ignore: true)]
+      @[YAML::Field(ignore: true)]
+      getter {{name}}_was : {{ opts[:klass] }} | Nil = nil
+
+      # Returns a Tuple of the previous and the current
+      # value of an instance variable if it has changed
+      def {{name}}_change : Tuple({{opts[:klass]}}?, {{opts[:klass]}}?)?
+        {@{{name}}_was, @{{name}}} if {{name}}_changed?
+      end
+    {% end %}
+  end
+
+  # :nodoc:
+  macro __track_changes__
     # Returns a `Hash` with all changed attributes.
     def changed_attributes
       all = attributes
@@ -339,28 +356,6 @@ abstract class ActiveModel::Model
       {% end %}
       modified
     end
-
-    {% for name, opts in FIELDS %}
-      @[JSON::Field(ignore: true)]
-      @[YAML::Field(ignore: true)]
-      getter? {{name}}_changed  = false
-
-      # Include `{{ name }}` in the set of changed attributes, whether it has changed or not.
-      def {{name}}_will_change! : Nil
-        @{{name}}_changed = true
-        @{{name}}_was = @{{name}}.dup
-      end
-
-      @[JSON::Field(ignore: true)]
-      @[YAML::Field(ignore: true)]
-      getter {{name}}_was : {{ opts[:klass] }} | Nil = nil
-
-      # Returns a Tuple of the previous and the current
-      # value of an instance variable if it has changed
-      def {{name}}_change : Tuple({{opts[:klass]}}?, {{opts[:klass]}}?)?
-        {@{{name}}_was, @{{name}}} if {{name}}_changed?
-      end
-    {% end %}
 
     # Reset each attribute to their previous values and clears all changes.
     def restore_attributes
