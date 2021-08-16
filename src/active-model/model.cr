@@ -464,7 +464,7 @@ abstract class ActiveModel::Model
       self.from_json(string_or_io, trusted: true)
     end
 
-    def self.from_trusted_json(string_or_io : String | IO, root : String, trusted : Bool = false) : self
+    def self.from_trusted_json(string_or_io : String | IO, root : String) : self
       self.from_json(string_or_io, root, true)
     end
 
