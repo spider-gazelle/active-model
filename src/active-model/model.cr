@@ -59,6 +59,18 @@ abstract class ActiveModel::Model
 
   protected def validation_error; end
 
+  def self.from_trusted_json(string_or_io : String | IO) : self
+    raise NotImplementedError.new("Abstract class def stub")
+  end
+
+  def self.from_trusted_yaml(string_or_io : String | IO) : self
+    raise NotImplementedError.new("Abstract class def stub")
+  end
+
+  def self.attributes : Array(Symbol)
+    raise NotImplementedError.new("Abstract class def stub")
+  end
+
   macro define_to_json(group, except = [] of Symbol, only = [] of Symbol, methods = [] of Symbol)
     {% only = only.resolve if only.is_a?(Path) %}
     {% except = except.resolve if except.is_a?(Path) %}
@@ -233,7 +245,7 @@ abstract class ActiveModel::Model
     # Assign to multiple attributes.
     def assign_attributes(
       {% for name, opts in FIELDS %}
-        {{name.id}} : {{opts[:klass]}} | Missing = Missing,
+        {{name.id}} : {{opts[:klass].id}} | Missing = Missing,
       {% end %}
     )
       {% for name, opts in FIELDS %}

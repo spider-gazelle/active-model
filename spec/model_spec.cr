@@ -382,7 +382,7 @@ describe ActiveModel::Model do
       BaseKlass.new.changed_attributes.should eq({:string => "hello", :integer => 45})
       klass = Inheritance.new
       klass.changed_attributes.should eq({:boolean => true, :string => "hello", :integer => 45})
-      klass.string_change.should eq ({nil, "hello"})
+      klass.string_change.should eq({nil, "hello"})
     end
 
     it "should allow changes information to be cleared" do
@@ -394,13 +394,13 @@ describe ActiveModel::Model do
       klass.no_default_changed?.should eq false
       klass.no_default = "bob"
       klass.no_default_changed?.should eq true
-      klass.no_default_change.should eq ({nil, "bob"})
+      klass.no_default_change.should eq({nil, "bob"})
       klass.changed?.should eq true
       klass.changed_attributes.should eq({:no_default => "bob"})
 
       klass.string_change.should eq nil
       klass.string = "else"
-      klass.string_change.should eq ({"hello", "else"})
+      klass.string_change.should eq({"hello", "else"})
     end
 
     it "should be able to mark attributes as changed" do
@@ -566,12 +566,12 @@ describe ActiveModel::Model do
         weird = "object"
 
         model = AttributeOptions.new(time: time, bob: bob, feeling: feeling, weird: weird)
-        model.persistent_attributes.should eq ({
+        model.persistent_attributes.should eq({
           :time  => time,
           :bob   => bob,
           :weird => weird,
         })
-        model.attributes.should eq ({
+        model.attributes.should eq({
           :time    => time,
           :bob     => bob,
           :weird   => weird,
