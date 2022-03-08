@@ -609,11 +609,7 @@ abstract class ActiveModel::Model
   )
     # Declaring correct type of attribute
     {% resolved_type = name.type.resolve %}
-    {% if resolved_type.nilable? %}
-      {% type_signature = resolved_type %}
-    {% else %}
-      {% type_signature = "#{resolved_type} | Nil".id %}
-    {% end %}
+    {% type_signature = resolved_type %}
 
     {% serialization_group = [serialization_group] if serialization_group.is_a?(SymbolLiteral) %}
     {% unless serialization_group.is_a? ArrayLiteral && serialization_group.all? &.is_a?(SymbolLiteral) %}
@@ -636,7 +632,11 @@ abstract class ActiveModel::Model
       key: {{tags[:yaml_key]}},
       emit_null: {{tags[:yaml_emit_null]}},
     )]
-    @{{name.var}} : {{type_signature.id}}
+    {% if resolved_type.nilable? %}
+      property {{name.var}} : {{type_signature.id}}
+    {% else %}
+      property! {{name.var}} : {{type_signature.id}}
+    {% end %}
 
     @[JSON::Field(ignore: true)]
     @[YAML::Field(ignore: true)]
