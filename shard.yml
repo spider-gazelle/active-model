@@ -1,5 +1,5 @@
 name: active-model
-version: 3.1.1
+version: 4.0.0
 crystal: ">= 1.0.0"
 license: MIT
 
@@ -7,10 +7,6 @@ dependencies:
   http-params-serializable:
     github: place-labs/http-params-serializable
     version: ~> 0.5
-  json_mapping:
-    github: crystal-lang/json_mapping.cr
-  yaml_mapping:
-    github: crystal-lang/yaml_mapping.cr
 
 development_dependencies:
   ameba:
@@ -19,3 +15,4 @@ development_dependencies:
 authors:
   - Stephen von Takach <steve@place.tech>
   - Caspian Baska <caspian@place.tech>
+  - Duke Nguyen <duke@place.tech>

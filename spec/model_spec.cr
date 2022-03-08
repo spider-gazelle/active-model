@@ -43,6 +43,12 @@ class SerializationGroups < BaseKlass
   getter foo = "foo"
 end
 
+class Tag < Abstract
+  attribute json_tag : String?, tags: {json_emit_null: true}
+  attribute yaml_tag : String, tags: {yaml_key: "first_key"}
+  attribute json_yaml_tag : String?, tags: {yaml_emit_null: true, json_key: "second_key"}
+end
+
 class Inheritance < BaseKlass
   attribute boolean : Bool = true
 
@@ -68,7 +74,7 @@ class EnumAttributes < ActiveModel::Model
     Fries
   end
 
-  attribute size : Size, converter: Enum::ValueConverter(Size), custom_tag: "what what"
+  attribute size : Size, converter: Enum::ValueConverter(::EnumAttributes::Size), custom_tag: "what what"
   attribute product : Product = Product::Fries
 end
 
@@ -127,6 +133,29 @@ describe ActiveModel::Model do
       })
     end
 
+    it "creates a new model from JSON with root params" do
+      bk = BaseKlass.from_json("{\"base\":{\"boolean\":false,\"integer\":67}}", root: "base")
+      bk.attributes.should eq({
+        :string     => "hello",
+        :integer    => 67,
+        :no_default => nil,
+      })
+
+      opts = AttributeOptions.from_trusted_json(%({"base":{"time": 1459859781, "bob": "Steve"}}), root: "base")
+      opts.time.should eq Time.unix(1459859781)
+      opts.bob.should eq "Steve"
+    end
+
+    it "serialises correctly with tags" do
+      tg_1 = Tag.from_json({yaml_tag: "hello", second_key: "wassup"}.to_json)
+      tg_1.to_json.should eq("{\"json_tag\":null,\"yaml_tag\":\"hello\",\"second_key\":\"wassup\"}")
+      tg_1.to_yaml.should eq({first_key: "hello", json_yaml_tag: "wassup"}.to_yaml)
+
+      tg_2 = Tag.from_yaml({json_tag: "hi", first_key: "first_here"}.to_yaml)
+      tg_2.to_json.should eq("{\"json_tag\":\"hi\",\"yaml_tag\":\"first_here\"}")
+      tg_2.to_yaml.should eq({json_tag: "hi", first_key: "first_here", "json_yaml_tag": nil}.to_yaml)
+    end
+
     it "uses named params for initialization" do
       bk = BaseKlass.new string: "bob", no_default: "jane"
       bk.attributes.should eq({
@@ -180,10 +209,6 @@ describe ActiveModel::Model do
 
       expect_raises(NilAssertionError) do
         bk.no_default
-      end
-
-      expect_raises(NilAssertionError) do
-        bk.no_default_default
       end
 
       i = Inheritance.new
@@ -348,10 +373,10 @@ describe ActiveModel::Model do
   describe "serialization" do
     it "#to_json" do
       i = Inheritance.new
-      i.to_json.should eq "{\"boolean\":true,\"string\":\"hello\",\"integer\":45}"
+      JSON.parse(i.to_json).should eq JSON.parse("{\"boolean\":true,\"string\":\"hello\",\"integer\":45}")
 
       i.no_default = "test"
-      i.to_json.should eq "{\"boolean\":true,\"string\":\"hello\",\"integer\":45,\"no_default\":\"test\"}"
+      JSON.parse(i.to_json).should eq JSON.parse("{\"boolean\":true,\"string\":\"hello\",\"integer\":45,\"no_default\":\"test\"}")
     end
 
     m = SerializationGroups.new

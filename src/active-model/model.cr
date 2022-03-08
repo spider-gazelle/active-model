@@ -1,13 +1,14 @@
-require "http/params"
 require "json"
-require "json_mapping"
 require "yaml"
-require "yaml_mapping"
-require "http-params-serializable/ext"
 
+require "http/params"
+require "http-params-serializable/ext"
 require "./http-params"
 
 abstract class ActiveModel::Model
+  include JSON::Serializable
+  include YAML::Serializable
+
   # :nodoc:
   FIELD_MAPPINGS = {} of Nil => Nil
 
@@ -38,6 +39,7 @@ abstract class ActiveModel::Model
     macro finished
       __process_attributes__
       __customize_orm__
+      __track_local_fields__
       {% unless @type.abstract? %}
       __track_changes__
       __map_json__
@@ -269,14 +271,32 @@ abstract class ActiveModel::Model
   end
 
   # :nodoc:
-  macro __track_changes__
-    # Define instance variable types
-    {% if HAS_KEYS[0] %}
-      {% for name, opts in FIELDS %}
-        @{{name}}_was : {{opts[:klass]}} | Nil
-      {% end %}
-    {% end %}
+  macro __track_local_fields__
+    {% for name, opts in LOCAL_FIELDS %}
+      @[JSON::Field(ignore: true)]
+      @[YAML::Field(ignore: true)]
+      getter? {{name}}_changed  = false
 
+      # Include `{{ name }}` in the set of changed attributes, whether it has changed or not.
+      def {{name}}_will_change! : Nil
+        @{{name}}_changed = true
+        @{{name}}_was = @{{name}}.dup
+      end
+
+      @[JSON::Field(ignore: true)]
+      @[YAML::Field(ignore: true)]
+      getter {{name}}_was : {{ opts[:klass] }} | Nil = nil
+
+      # Returns a Tuple of the previous and the current
+      # value of an instance variable if it has changed
+      def {{name}}_change : Tuple({{opts[:klass]}}?, {{opts[:klass]}}?)?
+        {@{{name}}_was, @{{name}}} if {{name}}_changed?
+      end
+    {% end %}
+  end
+
+  # :nodoc:
+  macro __track_changes__
     # Returns a `Hash` with all changed attributes.
     def changed_attributes
       all = attributes
@@ -318,6 +338,16 @@ abstract class ActiveModel::Model
       all.to_yaml(io)
     end
 
+    def clear_changes_information
+      {% if HAS_KEYS[0] %}
+        {% for name, index in FIELDS.keys %}
+          @{{name}}_changed = false
+          @{{name}}_was = nil
+        {% end %}
+      {% end %}
+      nil
+    end
+
     # Check if any attributes have changed.
     def changed?
       modified = false
@@ -326,33 +356,6 @@ abstract class ActiveModel::Model
       {% end %}
       modified
     end
-
-    {% for name, index in FIELDS.keys %}
-      # Check if `{{ name }}` is in the set of changed attributes.
-      def {{name}}_changed?
-        !!@{{name}}_changed
-      end
-
-      # Include `{{ name }}` in the set of changed attributes, whether it has changed or not.
-      def {{name}}_will_change!
-        @{{name}}_changed = true
-        @{{name}}_was = @{{name}}.dup
-      end
-
-      # Returns the previous value of `{{ name }}`.
-      def {{name}}_was
-        @{{name}}_was
-      end
-
-      # Returns `{ {{name}}_was, {{name}} }` if `{{name}}` has changed.
-      def {{name}}_change
-        if @{{name}}_changed
-          {@{{name}}_was, @{{name}}}
-        else
-          nil
-        end
-      end
-    {% end %}
 
     # Reset each attribute to their previous values and clears all changes.
     def restore_attributes
@@ -375,14 +378,18 @@ abstract class ActiveModel::Model
   end
 
   # :nodoc:
+  struct None
+  end
+
+  # :nodoc:
   macro __create_initializer__
     def initialize(
       {% for name, opts in FIELDS %}
-        {{name}} : {{opts[:klass]}} | Nil = nil,
+        {{name}} : {{opts[:klass]}} | ::ActiveModel::Model::None = ::ActiveModel::Model::None.new,
       {% end %}
     )
       {% for name, opts in FIELDS %}
-        self.{{name}} = {{name}} unless {{name}}.nil?
+        self.{{name}} = {{name}} unless {{name}}.is_a? ::ActiveModel::Model::None
       {% end %}
 
       apply_defaults
@@ -394,12 +401,13 @@ abstract class ActiveModel::Model
       apply_defaults
     end
 
-    # Override the map json
+    # Setters
     {% for name, opts in FIELDS %}
       # `{{name}}` setter
       def {{name}}=(value : {{opts[:klass]}})
         if !@{{name}}_changed && @{{name}} != value
           @{{name}}_changed = true
+
           @{{name}}_was = @{{name}}
         end
         {% if SETTERS[name] %}
@@ -416,127 +424,128 @@ abstract class ActiveModel::Model
   # :nodoc:
   # Adds the from_json method
   macro __map_json__
-    {% if HAS_KEYS[0] && !PERSIST.empty? %}
-      JSON.mapping(
-        {% for name, opts in PERSIST %}
-          {% if opts[:converter] %}
-            {{name}}: { type: {{opts[:type_signature]}}, setter: false, converter: {{opts[:converter]}} },
-          {% else %}
-            {{name}}: { type: {{opts[:type_signature]}}, setter: false },
-          {% end %}
-        {% end %}
-      )
-
-      # :nodoc:
-      def initialize(%pull : ::JSON::PullParser, trusted = false)
-        previous_def(%pull)
-        if !trusted
-          {% for name, opts in FIELDS %}
-            {% if !opts[:mass_assign] %}
-              @{{name}} = nil
-            {% end %}
-          {% end %}
-        end
-        apply_defaults
-        clear_changes_information
-      end
-
-      # Serialize from a trusted JSON source
-      def self.from_trusted_json(string_or_io : String | IO) : self
-        {{@type.name.id}}.new(::JSON::PullParser.new(string_or_io), true)
-      end
-
-      YAML.mapping(
-        {% for name, opts in PERSIST %}
-          {% if opts[:converter] %}
-            {{name}}: { type: {{opts[:type_signature]}}, setter: false, converter: {{opts[:converter]}} },
-          {% else %}
-            {{name}}: { type: {{opts[:type_signature]}}, setter: false },
-          {% end %}
-        {% end %}
-      )
-
-      # :nodoc:
-      def initialize(%yaml : YAML::ParseContext, %node : ::YAML::Nodes::Node, _dummy : Nil, trusted = false)
-        previous_def(%yaml, %node, nil)
-        if !trusted
-          {% for name, opts in FIELDS %}
-            {% if !opts[:mass_assign] %}
-              @{{name}} = nil
-            {% end %}
-          {% end %}
-        end
-        apply_defaults
-        clear_changes_information
-      end
-
-      # Serialize from a trusted YAML source
-      def self.from_trusted_yaml(string_or_io : String | IO) : self
-        ctx = YAML::ParseContext.new
-        node = begin
-          document = YAML::Nodes.parse(string_or_io)
-
-          # If the document is empty we simulate an empty scalar with
-          # plain style, that parses to Nil
-          document.nodes.first? || begin
-            scalar = YAML::Nodes::Scalar.new("")
-            scalar.style = YAML::ScalarStyle::PLAIN
-            scalar
-          end
-        end
-        {{@type.name.id}}.new(ctx, node, nil, true)
-      end
-
-      def assign_attributes_from_json(json)
-        json = json.read_string(json.read_remaining) if json.responds_to? :read_remaining && json.responds_to? :read_string
-        model = self.class.from_json(json)
-        data = JSON.parse(json).as_h
+    def after_initialize(trusted : Bool)
+      if !trusted
         {% for name, opts in FIELDS %}
-          {% if opts[:mass_assign] %}
-            self.{{name}} = model.{{name}} if data.has_key?({{name.stringify}}) && self.{{name}} != model.{{name}}
+          {% if !opts[:mass_assign] %}
+            @{{name}} = nil
           {% end %}
         {% end %}
-
-        self
       end
 
-      def assign_attributes_from_trusted_json(json)
-        json = json.read_string(json.read_remaining) if json.responds_to? :read_remaining && json.responds_to? :read_string
-        model = self.class.from_trusted_json(json)
-        data = JSON.parse(json).as_h
-        {% for name, opts in FIELDS %}
-          self.{{name}} = model.{{name}} if data.has_key?({{name.stringify}}) && self.{{name}} != model.{{name}}
+      apply_defaults
+      clear_changes_information
+    end
+
+    def self.from_json(string_or_io : String | IO, trusted : Bool = false) : self
+      super(string_or_io).tap &.after_initialize(trusted: trusted)
+    end
+
+    # Deserializes the given JSON in *string_or_io* into
+    # an instance of `self`, assuming the JSON consists
+    # of an JSON object with key *root*, and whose value is
+    # the value to deserialize. Will not deserialise from
+    # fields with mass_assign: false
+    #
+    # ```
+    # class User < ActiveModel::Model
+    #   attribute name : String
+    #   attribute google_id : UUID, mass_assign: false
+    # end
+    #
+    # User.from_json(%({"main": {"name": "Jason", "google_id": "f6f70bfb-c882-446d-8758-7ce47db39620"}}), root: "main") # => #<User:0x103131b20 @name="Jason">
+    # ```
+    def self.from_json(string_or_io : String | IO, root : String, trusted : Bool = false) : self
+      super(string_or_io, root).tap &.after_initialize(trusted: trusted)
+    end
+
+    # Serialize from a trusted JSON source
+    def self.from_trusted_json(string_or_io : String | IO) : self
+      self.from_json(string_or_io, trusted: true)
+    end
+
+    def self.from_trusted_json(string_or_io : String | IO, root : String) : self
+      self.from_json(string_or_io, root, true)
+    end
+
+    def self.from_yaml(string_or_io : String | IO, trusted : Bool = false) : self
+      super(string_or_io).tap &.after_initialize(trusted: trusted)
+    end
+
+    # Serialize from a trusted YAML source
+    def self.from_trusted_yaml(string_or_io : String | IO) : self
+      self.from_yaml(string_or_io, trusted: true)
+    end
+
+    def assign_attributes_from_json(json)
+      json = json.read_string(json.read_remaining) if json.responds_to? :read_remaining && json.responds_to? :read_string
+      model = self.class.from_json(json)
+      {% for name, opts in FIELDS %}
+        {% if opts[:mass_assign] %}
+          self.{{name}} = model.{{name}} if model.{{name.id}}_present? && self.{{name}} != model.{{name}}
         {% end %}
+      {% end %}
 
-        self
-      end
+      self
+    end
 
-      # Uses the YAML parser as JSON is valid YAML
-      def assign_attributes_from_yaml(yaml)
-        yaml = yaml.read_string(yaml.read_remaining) if yaml.responds_to? :read_remaining && yaml.responds_to? :read_string
-        model = self.class.from_yaml(yaml)
-        data = YAML.parse(yaml).as_h
-        {% for name, opts in FIELDS %}
-          {% if opts[:mass_assign] %}
-            self.{{name}} = model.{{name}} if data.has_key?({{name.stringify}}) && self.{{name}} != model.{{name}}
-          {% end %}
+    def assign_attributes_from_json(json, root : String)
+      json = json.read_string(json.read_remaining) if json.responds_to? :read_remaining && json.responds_to? :read_string
+      model = self.class.from_json(json, root: root)
+      {% for name, opts in FIELDS %}
+        {% if opts[:mass_assign] %}
+          self.{{name}} = model.{{name}} if model.{{name.id}}_present? && self.{{name}} != model.{{name}}
         {% end %}
+      {% end %}
 
-        self
-      end
+      self
+    end
 
-      def assign_attributes_from_trusted_yaml(yaml)
-        yaml = yaml.read_string(yaml.read_remaining) if yaml.responds_to? :read_remaining && yaml.responds_to? :read_string
-        model = self.class.from_trusted_yaml(yaml)
-        data = YAML.parse(yaml).as_h
-        {% for name, opts in FIELDS %}
-          self.{{name}} = model.{{name}} if data.has_key?({{name.stringify}}) && self.{{name}} != model.{{name}}
+    # Assign each field from JSON if field exists in JSON and has changed in model
+    def assign_attributes_from_trusted_json(json)
+      json = json.read_string(json.read_remaining) if json.responds_to? :read_remaining && json.responds_to? :read_string
+      model = self.class.from_trusted_json(json)
+      {% for name, opts in FIELDS %}
+        self.{{name}} = model.{{name}} if model.{{name.id}}_present? && self.{{name}} != model.{{name}}
+      {% end %}
+
+      self
+    end
+
+    def assign_attributes_from_trusted_json(json, root : String)
+      json = json.read_string(json.read_remaining) if json.responds_to? :read_remaining && json.responds_to? :read_string
+      model = self.class.from_trusted_json(json, root)
+      {% for name, opts in FIELDS %}
+        self.{{name}} = model.{{name}} if model.{{name.id}}_present? && self.{{name}} != model.{{name}}
+      {% end %}
+
+      self
+    end
+
+    # Uses the YAML parser as JSON is valid YAML
+    def assign_attributes_from_yaml(yaml)
+      yaml = yaml.read_string(yaml.read_remaining) if yaml.responds_to? :read_remaining && yaml.responds_to? :read_string
+      model = self.class.from_yaml(yaml)
+      data = YAML.parse(yaml).as_h
+      {% for name, opts in FIELDS %}
+        {% if opts[:mass_assign] %}
+          self.{{name}} = model.{{name}} if model.{{name.id}}_present? && self.{{name}} != model.{{name}}
         {% end %}
+      {% end %}
 
-        self
-      end
+      self
+    end
 
-    {% end %}
+    def assign_attributes_from_trusted_yaml(yaml)
+      yaml = yaml.read_string(yaml.read_remaining) if yaml.responds_to? :read_remaining && yaml.responds_to? :read_string
+      model = self.class.from_trusted_yaml(yaml)
+      data = YAML.parse(yaml).as_h
+      {% for name, opts in FIELDS %}
+        self.{{name}} = model.{{name}} if model.{{name.id}}_present? && self.{{name}} != model.{{name}}
+      {% end %}
+
+      self
+    end
   end
 
   macro __nilability_validation__
@@ -569,6 +578,26 @@ abstract class ActiveModel::Model
     {% end %}
   end
 
+  # Declare an `ActiveModel::Model` attribute
+  #
+  # # General Arguments
+  #
+  # - `persistence`: Will not emit the key when serializing if `false`.
+  # - `converter`: A module defining alternative serialisation behaviour for the attribute's value.
+  #
+  # # Serialisation Target Arguments
+  #
+  # Additionally, `attribute` accepts the following optional arguments for different serialisation targets.
+  #
+  # ## JSON
+  # - `json_key`: Override the emitted JSON key.
+  # - `json_emit_null`: Emit `null` if value is `nil`, key is omitted if `json_emit_null` is `false`.
+  # - `json_root`: Assume value is inside a JSON object under the provided key.
+  # ## YAML
+  # - `yaml_key`: Override the emitted YAML key.
+  # - `yaml_emit_null`: Emit `null` if value is `nil`, key is omitted if `yaml_emit_null` is `false`.
+  # - `yaml_root`: Assume value is inside a YAMLk object under the provided key.
+  #
   macro attribute(
     name,
     converter = nil,
@@ -578,26 +607,47 @@ abstract class ActiveModel::Model
     **tags,
     &block
   )
+    # Declaring correct type of attribute
     {% resolved_type = name.type.resolve %}
-    {% if resolved_type.nilable? %}
-      {% type_signature = resolved_type %}
-    {% else %}
-      {% type_signature = "#{resolved_type} | Nil".id %}
-    {% end %}
+    {% type_signature = resolved_type %}
 
     {% serialization_group = [serialization_group] if serialization_group.is_a?(SymbolLiteral) %}
     {% unless serialization_group.is_a? ArrayLiteral && serialization_group.all? &.is_a?(SymbolLiteral) %}
       {% raise "`serialization_group` expected to be an Array(Symbol) | Symbol, got #{serialization_group.class_name}" %}
     {% end %}
 
-    @{{name.var}} : {{type_signature.id}}
+    # Assign instance variable to correct type
+    @[JSON::Field(
+      presence: true,
+      converter: {{ converter }},
+      ignore: {{ !persistence }},
+      key: {{tags[:json_key]}},
+      emit_null: {{tags[:json_emit_null]}},
+      root: {{tags[:json_root]}},
+    )]
+    @[YAML::Field(
+      presence: true,
+      converter: {{ converter }},
+      ignore: {{ !persistence }},
+      key: {{tags[:yaml_key]}},
+      emit_null: {{tags[:yaml_emit_null]}},
+    )]
+    {% if resolved_type.nilable? %}
+      property {{name.var}} : {{type_signature.id}}
+    {% else %}
+      property! {{name.var}} : {{type_signature.id}}
+    {% end %}
+
+    @[JSON::Field(ignore: true)]
+    @[YAML::Field(ignore: true)]
+    getter? {{name.var}}_present : Bool = false
 
     # `{{ name.var.id }}`'s default value
     def {{name.var.id}}_default : {{ name.type }}
+      # Check if name.value is not nil
       {% if name.value || name.value == false %}
         {{ name.value }}
-      {% elsif !resolved_type.nilable? %}
-        raise NilAssertionError.new("No default for {{@type}}{{'#'.id}}{{name.var.id}}" )
+      # Type is nilable
       {% else %}
         nil
       {% end %}
@@ -632,7 +682,10 @@ abstract class ActiveModel::Model
         type_signature:      type_signature,
       }
     %}
+
     {% HAS_KEYS[0] = true %}
+
+    # Declare default values if name.value is not nil
     {% if name.value || name.value == false %}
       {% DEFAULTS[name.var.id] = name.value %}
     {% end %}
