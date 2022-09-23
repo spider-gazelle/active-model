@@ -132,15 +132,94 @@ abstract class ActiveModel::Model
     %}
 
     {% for serialization_group in serialization_group %}
+      # attributes
+      {%
+        in_group = FIELDS.to_a.select do |(_n, o)|
+          o[:serialization_group] && o[:serialization_group].includes?(serialization_group)
+        end
+      %}
+
+      struct {{ serialization_group.id.stringify.camelcase.id }}Response
+        include JSON::Serializable
+        include JSON::Serializable::Unmapped
+
+        {% for kv in in_group %}
+          {% name = kv[0] %}
+          {% opts = kv[1] %}
+
+          {% if opts[:converter] %}
+          @[JSON::Field(converter: {{opts[:converter]}} )]
+          {% end %}
+          getter {{name}} : {{opts[:type_signature]}}
+        {% end %}
+
+        {% if GROUP_METHODS[serialization_group] %}
+          {% for method in GROUP_METHODS[serialization_group] %}
+            {% method_def = @type.methods.find { |meth| meth.name.symbolize == method.id.symbolize } %}
+            {% if method_def && !method_def.return_type.nil? %}
+              getter {{method_def.name}} : {{method_def.return_type}}
+            {% end %}
+          {% end %}
+        {% end %}
+
+        {% nop_methods = 0 %}
+        def initialize(
+          {% for kv in in_group %}
+            {% name = kv[0] %}
+            {% opts = kv[1] %}
+            @{{name}} : {{opts[:type_signature]}},
+          {% end %}
+
+          {% if GROUP_METHODS[serialization_group] %}
+            {% for method in GROUP_METHODS[serialization_group] %}
+              {% method_def = @type.methods.find { |meth| meth.name.symbolize == method.id.symbolize } %}
+              {% if method_def %}
+                {% if !method_def.return_type.nil? %}
+                  @{{method_def.name}} : {{method_def.return_type}},
+                {% else %}
+                  {% nop_methods = nop_methods + 1 %}
+                {% end %}
+              {% end %}
+            {% end %}
+          {% end %}
+
+          **_unknow_types
+        )
+          # Temporary hack as we migrate to AC5 / always define types for performance
+          json_unmapped = Hash(String, JSON::Any).new({{nop_methods}}) { |key| raise KeyError.new "Missing hash key: #{key.inspect}" }
+          {% if GROUP_METHODS[serialization_group] %}
+            {% for method in GROUP_METHODS[serialization_group] %}
+              {% method_def = @type.methods.find { |meth| meth.name.symbolize == method.id.symbolize } %}
+              {% if method_def && method_def.return_type.nil? %}
+                json_unmapped[{{method_def.name.stringify}}] = JSON.parse(_unknow_types[{{method_def.name.symbolize}}].to_json)
+              {% end %}
+            {% end %}
+          {% end %}
+          @json_unmapped = json_unmapped
+        end
+      end
+
+      def to_{{ serialization_group.id }}_struct
+        {{ serialization_group.id.stringify.camelcase.id }}Response.new(
+          {% for kv in in_group %}
+            {% name = kv[0] %}
+            {% opts = kv[1] %}
+            {{name}}: @{{name}}.as({{opts[:type_signature]}}),
+          {% end %}
+
+          {% if GROUP_METHODS[serialization_group] %}
+            {% for method in GROUP_METHODS[serialization_group] %}
+              {% method_def = @type.methods.find { |meth| meth.name.symbolize == method.id.symbolize } %}
+              {{method_def.name}}: {{method_def.name}},
+            {% end %}
+          {% end %}
+        )
+      end
+
       # Serialize attributes with `{{ serialization_group }}` in its `serialization_group` option
       def to_{{ serialization_group.id }}_json(json : ::JSON::Builder)
         json.object do
           # Serialize attributes
-          {%
-            in_group = FIELDS.to_a.select do |(_n, o)|
-              o[:serialization_group] && o[:serialization_group].includes?(serialization_group)
-            end
-          %}
           {% for kv in in_group %}
             {% name = kv[0] %}
             {% opts = kv[1] %}

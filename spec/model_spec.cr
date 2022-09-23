@@ -381,10 +381,14 @@ describe ActiveModel::Model do
 
     m = SerializationGroups.new
 
-    it "`serialization_group` optio ngenerates serializers" do
+    it "`serialization_group` option generates serializers" do
       m.to_admin_json.should eq ({everywhere: m.everywhere, joined: m.joined}).to_json
       m.to_user_json.should eq ({everywhere: m.everywhere, joined: m.joined, mates: m.mates}).to_json
       m.to_public_json.should eq ({everywhere: m.everywhere}).to_json
+
+      m.to_admin_struct.to_json.should eq ({everywhere: m.everywhere, joined: m.joined}).to_json
+      m.to_user_struct.to_json.should eq ({everywhere: m.everywhere, joined: m.joined, mates: m.mates}).to_json
+      m.to_public_struct.to_json.should eq ({everywhere: m.everywhere}).to_json
     end
 
     describe "define_to_json" do
