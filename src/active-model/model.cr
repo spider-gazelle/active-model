@@ -330,6 +330,15 @@ abstract class ActiveModel::Model
 
       self
     end
+
+    # Assign to multiple attributes from a model object
+    def assign_attributes(model : {{@type.name}})
+      {% for name, opts in FIELDS %}
+        {% if opts[:mass_assign] == true %}
+          self.{{name.id}} = model.{{name.id}} if model.{{name.id}}_assigned?
+        {% end %}
+      {% end %}
+    end
   end
 
   # :nodoc:
@@ -356,9 +365,14 @@ abstract class ActiveModel::Model
       @[YAML::Field(ignore: true)]
       getter? {{name}}_changed  = false
 
+      @[JSON::Field(ignore: true)]
+      @[YAML::Field(ignore: true)]
+      getter? {{name}}_assigned = false
+
       # Include `{{ name }}` in the set of changed attributes, whether it has changed or not.
       def {{name}}_will_change! : Nil
         @{{name}}_changed = true
+        @{{name}}_assigned = true
         @{{name}}_was = @{{name}}.dup
       end
 
@@ -417,16 +431,6 @@ abstract class ActiveModel::Model
       all.to_yaml(io)
     end
 
-    def clear_changes_information
-      {% if HAS_KEYS[0] %}
-        {% for name, index in FIELDS.keys %}
-          @{{name}}_changed = false
-          @{{name}}_was = nil
-        {% end %}
-      {% end %}
-      nil
-    end
-
     # Check if any attributes have changed.
     def changed?
       modified = false
@@ -449,6 +453,7 @@ abstract class ActiveModel::Model
       {% if HAS_KEYS[0] %}
         {% for name, index in FIELDS.keys %}
           @{{name}}_changed = false
+          @{{name}}_assigned = false
           @{{name}}_was = nil
         {% end %}
       {% end %}
@@ -484,6 +489,8 @@ abstract class ActiveModel::Model
     {% for name, opts in FIELDS %}
       # `{{name}}` setter
       def {{name}}=(value : {{opts[:klass]}})
+        @{{name}}_assigned = true
+
         if !@{{name}}_changed && @{{name}} != value
           @{{name}}_changed = true
 

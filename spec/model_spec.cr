@@ -284,8 +284,14 @@ describe ActiveModel::Model do
 
     it "tracks changes to enum attributes" do
       model = EnumAttributes.new(size: EnumAttributes::Size::Medium)
+      model.size_changed?.should be_true
       model.clear_changes_information
 
+      model.size_assigned?.should be_false
+      model.size_changed?.should be_false
+      model.size = EnumAttributes::Size::Medium
+
+      model.size_assigned?.should be_true
       model.size_changed?.should be_false
       model.size = EnumAttributes::Size::Small
       model.size_changed?.should be_true
@@ -339,6 +345,20 @@ describe ActiveModel::Model do
   end
 
   describe "assign_attributes" do
+    it "using model assignment" do
+      changes = BaseKlass.new
+      changes.clear_changes_information
+      changes.string = "new change"
+
+      bk = BaseKlass.new
+      bk.clear_changes_information
+
+      bk.assign_attributes(changes)
+      bk.changed_attributes.should eq({
+        :string => "new change",
+      })
+    end
+
     it "affects changes metadata" do
       bk = BaseKlass.new
       bk.clear_changes_information
