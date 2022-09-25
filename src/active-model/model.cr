@@ -155,9 +155,18 @@ abstract class ActiveModel::Model
 
         {% if GROUP_METHODS[serialization_group] %}
           {% for method in GROUP_METHODS[serialization_group] %}
-            {% method_def = @type.methods.find { |meth| meth.name.symbolize == method.id.symbolize } %}
-            {% if method_def && !method_def.return_type.nil? %}
-              getter {{method_def.name}} : {{method_def.return_type}}
+            {% ancestors = [@type] + @type.ancestors %}
+            {% found = false %}
+            {% for klass in ancestors %}
+              {% if !found %}
+                {% method_def = klass.methods.find { |meth| meth.name.symbolize == method.id.symbolize } %}
+                {% if method_def %}
+                  {% found = true %}
+                {% end %}
+                {% if method_def && !method_def.return_type.nil? %}
+                  getter {{method_def.name}} : {{method_def.return_type}}
+                {% end %}
+              {% end %}
             {% end %}
           {% end %}
         {% end %}
@@ -172,12 +181,19 @@ abstract class ActiveModel::Model
 
           {% if GROUP_METHODS[serialization_group] %}
             {% for method in GROUP_METHODS[serialization_group] %}
-              {% method_def = @type.methods.find { |meth| meth.name.symbolize == method.id.symbolize } %}
-              {% if method_def %}
-                {% if !method_def.return_type.nil? %}
-                  @{{method_def.name}} : {{method_def.return_type}},
-                {% else %}
-                  {% nop_methods = nop_methods + 1 %}
+              {% ancestors = [@type] + @type.ancestors %}
+              {% found = false %}
+              {% for klass in ancestors %}
+                {% if !found %}
+                  {% method_def = klass.methods.find { |meth| meth.name.symbolize == method.id.symbolize } %}
+                  {% if method_def %}
+                    {% found = true %}
+                    {% if !method_def.return_type.nil? %}
+                      @{{method_def.name}} : {{method_def.return_type}},
+                    {% else %}
+                      {% nop_methods = nop_methods + 1 %}
+                    {% end %}
+                  {% end %}
                 {% end %}
               {% end %}
             {% end %}
@@ -209,8 +225,7 @@ abstract class ActiveModel::Model
 
           {% if GROUP_METHODS[serialization_group] %}
             {% for method in GROUP_METHODS[serialization_group] %}
-              {% method_def = @type.methods.find { |meth| meth.name.symbolize == method.id.symbolize } %}
-              {{method_def.name}}: {{method_def.name}},
+              {{method.id}}: {{method.id}},
             {% end %}
           {% end %}
         )
