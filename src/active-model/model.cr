@@ -583,7 +583,7 @@ abstract class ActiveModel::Model
       model = self.class.from_json(json)
       {% for name, opts in FIELDS %}
         {% if opts[:mass_assign] %}
-          self.{{name}} = model.{{name}} if model.{{name.id}}_present? && self.{{name}} != model.{{name}}
+          self.{{name}} = model.{{name}} if model.{{name.id}}_present? && @{{name}} != model.{{name}}
         {% end %}
       {% end %}
 
@@ -595,7 +595,7 @@ abstract class ActiveModel::Model
       model = self.class.from_json(json, root: root)
       {% for name, opts in FIELDS %}
         {% if opts[:mass_assign] %}
-          self.{{name}} = model.{{name}} if model.{{name.id}}_present? && self.{{name}} != model.{{name}}
+          self.{{name}} = model.{{name}} if model.{{name.id}}_present? && @{{name}} != model.{{name}}
         {% end %}
       {% end %}
 
@@ -607,7 +607,7 @@ abstract class ActiveModel::Model
       json = json.read_string(json.read_remaining) if json.responds_to? :read_remaining && json.responds_to? :read_string
       model = self.class.from_trusted_json(json)
       {% for name, opts in FIELDS %}
-        self.{{name}} = model.{{name}} if model.{{name.id}}_present? && self.{{name}} != model.{{name}}
+        self.{{name}} = model.{{name}} if model.{{name.id}}_present? && @{{name}} != model.{{name}}
       {% end %}
 
       self
@@ -617,7 +617,7 @@ abstract class ActiveModel::Model
       json = json.read_string(json.read_remaining) if json.responds_to? :read_remaining && json.responds_to? :read_string
       model = self.class.from_trusted_json(json, root)
       {% for name, opts in FIELDS %}
-        self.{{name}} = model.{{name}} if model.{{name.id}}_present? && self.{{name}} != model.{{name}}
+        self.{{name}} = model.{{name}} if model.{{name.id}}_present? && @{{name}} != model.{{name}}
       {% end %}
 
       self
@@ -630,7 +630,7 @@ abstract class ActiveModel::Model
       data = YAML.parse(yaml).as_h
       {% for name, opts in FIELDS %}
         {% if opts[:mass_assign] %}
-          self.{{name}} = model.{{name}} if model.{{name.id}}_present? && self.{{name}} != model.{{name}}
+          self.{{name}} = model.{{name}} if model.{{name.id}}_present? && @{{name}} != model.{{name}}
         {% end %}
       {% end %}
 
@@ -642,7 +642,7 @@ abstract class ActiveModel::Model
       model = self.class.from_trusted_yaml(yaml)
       data = YAML.parse(yaml).as_h
       {% for name, opts in FIELDS %}
-        self.{{name}} = model.{{name}} if model.{{name.id}}_present? && self.{{name}} != model.{{name}}
+        self.{{name}} = model.{{name}} if model.{{name.id}}_present? && @{{name}} != model.{{name}}
       {% end %}
 
       self
