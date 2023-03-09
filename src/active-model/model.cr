@@ -1,5 +1,6 @@
 require "json"
 require "yaml"
+require "db"
 
 require "http/params"
 require "http-params-serializable/ext"
@@ -8,6 +9,7 @@ require "./http-params"
 abstract class ActiveModel::Model
   include JSON::Serializable
   include YAML::Serializable
+  include DB::Serializable
 
   # :nodoc:
   FIELD_MAPPINGS = {} of Nil => Nil
@@ -732,6 +734,10 @@ abstract class ActiveModel::Model
       emit_null: {{tags[:yaml_emit_null]}},
       {{**tags}}
     )]
+    @[DB::Field(
+      ignore: {{ !persistence }},
+      {{**tags}}
+    )]
     {% if resolved_type.nilable? %}
       property {{name.var}} : {{type_signature.id}}
     {% else %}
@@ -740,6 +746,7 @@ abstract class ActiveModel::Model
 
     @[JSON::Field(ignore: true)]
     @[YAML::Field(ignore: true)]
+    @[DB::Field(ignore: true)]
     getter? {{name.var}}_present : Bool = false
 
     # `{{ name.var.id }}`'s default value
