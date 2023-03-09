@@ -142,14 +142,14 @@ abstract class ActiveModel::Model
       struct {{ serialization_group.id.stringify.camelcase.id }}Response
         include JSON::Serializable
         include JSON::Serializable::Unmapped
+        include YAML::Serializable
 
         {% for kv in in_group %}
           {% name = kv[0] %}
           {% opts = kv[1] %}
 
-          {% if opts[:converter] %}
-          @[JSON::Field(converter: {{opts[:converter]}} )]
-          {% end %}
+          @[JSON::Field( {{**opts}} )]
+          @[YAML::Field( {{**opts}} )]
           getter {{name}} : {{opts[:type_signature]}}
         {% end %}
 
@@ -701,7 +701,6 @@ abstract class ActiveModel::Model
   #
   macro attribute(
     name,
-    converter = nil,
     mass_assignment = true,
     persistence = true,
     serialization_group = [] of Symbol,
@@ -720,18 +719,18 @@ abstract class ActiveModel::Model
     # Assign instance variable to correct type
     @[JSON::Field(
       presence: true,
-      converter: {{ converter }},
       ignore: {{ !persistence }},
       key: {{tags[:json_key]}},
       emit_null: {{tags[:json_emit_null]}},
       root: {{tags[:json_root]}},
+      {{**tags}}
     )]
     @[YAML::Field(
       presence: true,
-      converter: {{ converter }},
       ignore: {{ !persistence }},
       key: {{tags[:yaml_key]}},
       emit_null: {{tags[:yaml_emit_null]}},
+      {{**tags}}
     )]
     {% if resolved_type.nilable? %}
       property {{name.var}} : {{type_signature.id}}
@@ -754,20 +753,17 @@ abstract class ActiveModel::Model
       {% end %}
     end
 
-    {% if tags.empty? == true %}
-      {% tags = nil %}
-    {% end %}
 
     {% SETTERS[name.var.id] = block || nil %}
 
     {%
       LOCAL_FIELDS[name.var.id] = {
         klass:               resolved_type,
-        converter:           converter,
+        converter:           tags[:converter],
         mass_assign:         mass_assignment,
         should_persist:      persistence,
         serialization_group: serialization_group,
-        tags:                tags,
+        tags:                tags.empty? == true ? nil : tags,
         type_signature:      type_signature,
       }
     %}
@@ -775,11 +771,11 @@ abstract class ActiveModel::Model
     {%
       FIELDS[name.var.id] = {
         klass:               resolved_type,
-        converter:           converter,
+        converter:           tags[:converter],
         mass_assign:         mass_assignment,
         should_persist:      persistence,
         serialization_group: serialization_group,
-        tags:                tags,
+        tags:                tags.empty? == true ? nil : tags,
         type_signature:      type_signature,
       }
     %}

@@ -266,6 +266,7 @@ describe ActiveModel::Model do
     it "should serialize/deserialize enum attributes" do
       model = EnumAttributes.new(size: EnumAttributes::Size::Medium)
       model_json = model.to_json
+      model_json.should eq %({"size":1,"product":"fries"})
       parsed_model = EnumAttributes.from_trusted_json(model_json)
       parsed_model.product.should eq model.product
       parsed_model.size.should eq model.size
