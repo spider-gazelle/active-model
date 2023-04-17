@@ -241,7 +241,7 @@ abstract class ActiveModel::Model
             {% name = kv[0] %}
             {% opts = kv[1] %}
             %value = @{{name}}
-            json.field({{ name.stringify }}) do
+            json.field({{ (opts[:tags] && opts[:tags][:json_key]) || name.stringify }}) do
               {% if opts[:converter] %}
                 if !%value.nil?
                   {{ opts[:converter] }}.to_json(%value, json)
@@ -530,7 +530,7 @@ abstract class ActiveModel::Model
     def after_initialize(trusted : Bool)
       if !trusted
         {% for name, opts in FIELDS %}
-          {% if !opts[:mass_assign] %}
+          {% if !opts[:mass_assign] && !opts[:show] %}
             @{{name}} = nil
           {% end %}
         {% end %}
@@ -705,6 +705,7 @@ abstract class ActiveModel::Model
     name,
     mass_assignment = true,
     persistence = true,
+    show = false,
     serialization_group = [] of Symbol,
     **tags,
     &block
@@ -721,7 +722,7 @@ abstract class ActiveModel::Model
     # Assign instance variable to correct type
     @[JSON::Field(
       presence: true,
-      ignore: {{ !persistence }},
+      ignore: {{ !show && !persistence }},
       key: {{tags[:json_key]}},
       emit_null: {{tags[:json_emit_null]}},
       root: {{tags[:json_root]}},
@@ -729,7 +730,7 @@ abstract class ActiveModel::Model
     )]
     @[YAML::Field(
       presence: true,
-      ignore: {{ !persistence }},
+      ignore: {{ !show && !persistence }},
       key: {{tags[:yaml_key]}},
       emit_null: {{tags[:yaml_emit_null]}},
       {{**tags}}
@@ -768,6 +769,7 @@ abstract class ActiveModel::Model
         klass:               resolved_type,
         converter:           tags[:converter],
         mass_assign:         mass_assignment,
+        show:                show,
         should_persist:      persistence,
         serialization_group: serialization_group,
         tags:                tags.empty? == true ? nil : tags,
@@ -780,6 +782,7 @@ abstract class ActiveModel::Model
         klass:               resolved_type,
         converter:           tags[:converter],
         mass_assign:         mass_assignment,
+        show:                show,
         should_persist:      persistence,
         serialization_group: serialization_group,
         tags:                tags.empty? == true ? nil : tags,
