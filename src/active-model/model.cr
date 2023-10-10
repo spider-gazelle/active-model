@@ -352,7 +352,7 @@ abstract class ActiveModel::Model
     def assign_attributes(model : {{@type.name}})
       {% for name, opts in FIELDS %}
         {% if opts[:mass_assign] == true %}
-          self.{{name.id}} = model.{{name.id}} if model.{{name.id}}_assigned?
+          self.{{name.id}} = model.{{name.id}} if model.{{name.id}}_assigned? || model.{{name.id}}_present?
         {% end %}
       {% end %}
     end
