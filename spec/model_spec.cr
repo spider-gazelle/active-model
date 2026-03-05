@@ -9,7 +9,7 @@ end
 
 # Inheritance should be supported
 class BaseKlass < Abstract
-  attribute string : String = ->{ "hello" }
+  attribute string : String = -> { "hello" }
   attribute integer : Int32 = 45
   attribute no_default : String
 end

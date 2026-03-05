@@ -150,8 +150,8 @@ abstract class ActiveModel::Model
           {% name = kv[0] %}
           {% opts = kv[1] %}
 
-          @[JSON::Field( {{**opts}} )]
-          @[YAML::Field( {{**opts}} )]
+          @[JSON::Field( {{opts.double_splat}} )]
+          @[YAML::Field( {{opts.double_splat}} )]
           getter {{name}} : {{opts[:type_signature]}}
         {% end %}
 
@@ -336,7 +336,19 @@ abstract class ActiveModel::Model
     )
       {% for name, opts in FIELDS %}
         {% if opts[:mass_assign] == true %}
-          self.{{name.id}} = {{name.id}} unless {{name.id}}.is_a?(Missing)
+          unless {{name.id}}.is_a?(Missing)
+            %value = {{name.id}}
+            # Convert empty strings to nil for field removal
+            {% if opts[:klass].nilable? %}
+              if %value.responds_to?(:empty?) && %value.empty?
+                self.{{name.id}} = nil
+              else
+                self.{{name.id}} = %value
+              end
+            {% else %}
+              self.{{name.id}} = %value
+            {% end %}
+          end
         {% end %}
       {% end %}
     end
@@ -352,7 +364,19 @@ abstract class ActiveModel::Model
     def assign_attributes(model : {{@type.name}})
       {% for name, opts in FIELDS %}
         {% if opts[:mass_assign] == true %}
-          self.{{name.id}} = model.{{name.id}} if model.{{name.id}}_assigned? || model.{{name.id}}_present?
+          if model.{{name.id}}_assigned? || model.{{name.id}}_present?
+            %value = model.{{name.id}}
+            # Convert empty strings to nil for field removal
+            {% if opts[:klass].nilable? %}
+              if %value.responds_to?(:empty?) && %value.empty?
+                self.{{name.id}} = nil
+              else
+                self.{{name.id}} = %value
+              end
+            {% else %}
+              self.{{name.id}} = %value
+            {% end %}
+          end
         {% end %}
       {% end %}
     end
@@ -385,6 +409,10 @@ abstract class ActiveModel::Model
       @[JSON::Field(ignore: true)]
       @[YAML::Field(ignore: true)]
       getter? {{name}}_assigned = false
+
+      @[JSON::Field(ignore: true)]
+      @[YAML::Field(ignore: true)]
+      getter? {{name}}_removed = false
 
       # Include `{{ name }}` in the set of changed attributes, whether it has changed or not.
       def {{name}}_will_change! : Nil
@@ -471,6 +499,7 @@ abstract class ActiveModel::Model
         {% for name, index in FIELDS.keys %}
           @{{name}}_changed = false
           @{{name}}_assigned = false
+          @{{name}}_removed = false
           @{{name}}_was = nil
         {% end %}
       {% end %}
@@ -513,6 +542,16 @@ abstract class ActiveModel::Model
 
           @{{name}}_was = @{{name}}
         end
+
+        # Track if the value is being removed (set to nil or empty string)
+        if value.nil?
+          @{{name}}_removed = true
+        elsif value.responds_to?(:empty?) && value.empty?
+          @{{name}}_removed = true
+        else
+          @{{name}}_removed = false
+        end
+
         {% if SETTERS[name] %}
           @{{name}} = ->({{ SETTERS[name].args.first }} : {{opts[:klass]}}){
             {{ SETTERS[name].body }}
@@ -585,7 +624,19 @@ abstract class ActiveModel::Model
       model = self.class.from_json(json)
       {% for name, opts in FIELDS %}
         {% if opts[:mass_assign] %}
-          self.{{name}} = model.{{name}} if model.{{name.id}}_present?
+          if model.{{name.id}}_present?
+            %value = model.{{name}}
+            # Convert empty strings to nil for field removal
+            {% if opts[:klass].nilable? %}
+              if %value.responds_to?(:empty?) && %value.empty?
+                self.{{name}} = nil
+              else
+                self.{{name}} = %value
+              end
+            {% else %}
+              self.{{name}} = %value
+            {% end %}
+          end
         {% end %}
       {% end %}
 
@@ -597,7 +648,19 @@ abstract class ActiveModel::Model
       model = self.class.from_json(json, root: root)
       {% for name, opts in FIELDS %}
         {% if opts[:mass_assign] %}
-          self.{{name}} = model.{{name}} if model.{{name.id}}_present?
+          if model.{{name.id}}_present?
+            %value = model.{{name}}
+            # Convert empty strings to nil for field removal
+            {% if opts[:klass].nilable? %}
+              if %value.responds_to?(:empty?) && %value.empty?
+                self.{{name}} = nil
+              else
+                self.{{name}} = %value
+              end
+            {% else %}
+              self.{{name}} = %value
+            {% end %}
+          end
         {% end %}
       {% end %}
 
@@ -609,7 +672,19 @@ abstract class ActiveModel::Model
       json = json.read_string(json.read_remaining) if json.responds_to? :read_remaining && json.responds_to? :read_string
       model = self.class.from_trusted_json(json)
       {% for name, opts in FIELDS %}
-        self.{{name}} = model.{{name}} if model.{{name.id}}_present?
+        if model.{{name.id}}_present?
+          %value = model.{{name}}
+          # Treat empty strings as nil to support field removal (only for nilable fields)
+          {% if opts[:klass].nilable? %}
+            if %value.responds_to?(:empty?) && %value.empty?
+              self.{{name}} = nil
+            else
+              self.{{name}} = %value
+            end
+          {% else %}
+            self.{{name}} = %value
+          {% end %}
+        end
       {% end %}
 
       self
@@ -619,7 +694,19 @@ abstract class ActiveModel::Model
       json = json.read_string(json.read_remaining) if json.responds_to? :read_remaining && json.responds_to? :read_string
       model = self.class.from_trusted_json(json, root)
       {% for name, opts in FIELDS %}
-        self.{{name}} = model.{{name}} if model.{{name.id}}_present?
+        if model.{{name.id}}_present?
+          %value = model.{{name}}
+          # Treat empty strings as nil to support field removal (only for nilable fields)
+          {% if opts[:klass].nilable? %}
+            if %value.responds_to?(:empty?) && %value.empty?
+              self.{{name}} = nil
+            else
+              self.{{name}} = %value
+            end
+          {% else %}
+            self.{{name}} = %value
+          {% end %}
+        end
       {% end %}
 
       self
@@ -632,7 +719,19 @@ abstract class ActiveModel::Model
       data = YAML.parse(yaml).as_h
       {% for name, opts in FIELDS %}
         {% if opts[:mass_assign] %}
-          self.{{name}} = model.{{name}} if model.{{name.id}}_present?
+          if model.{{name.id}}_present?
+            %value = model.{{name}}
+            # Treat empty strings as nil to support field removal (only for nilable fields)
+            {% if opts[:klass].nilable? %}
+              if %value.responds_to?(:empty?) && %value.empty?
+                self.{{name}} = nil
+              else
+                self.{{name}} = %value
+              end
+            {% else %}
+              self.{{name}} = %value
+            {% end %}
+          end
         {% end %}
       {% end %}
 
@@ -644,7 +743,19 @@ abstract class ActiveModel::Model
       model = self.class.from_trusted_yaml(yaml)
       data = YAML.parse(yaml).as_h
       {% for name, opts in FIELDS %}
-        self.{{name}} = model.{{name}} if model.{{name.id}}_present?
+        if model.{{name.id}}_present?
+          %value = model.{{name}}
+          # Treat empty strings as nil to support field removal (only for nilable fields)
+          {% if opts[:klass].nilable? %}
+            if %value.responds_to?(:empty?) && %value.empty?
+              self.{{name}} = nil
+            else
+              self.{{name}} = %value
+            end
+          {% else %}
+            self.{{name}} = %value
+          {% end %}
+        end
       {% end %}
 
       self
@@ -726,18 +837,18 @@ abstract class ActiveModel::Model
       key: {{tags[:json_key]}},
       emit_null: {{tags[:json_emit_null]}},
       root: {{tags[:json_root]}},
-      {{**tags}}
+      {{tags.double_splat}}
     )]
     @[YAML::Field(
       presence: true,
       ignore: {{ !show && !persistence }},
       key: {{tags[:yaml_key]}},
       emit_null: {{tags[:yaml_emit_null]}},
-      {{**tags}}
+      {{tags.double_splat}}
     )]
     @[DB::Field(
       ignore: {{ !persistence }},
-      {{**tags}}
+      {{tags.double_splat}}
     )]
     {% if resolved_type.nilable? %}
       property {{name.var}} : {{type_signature.id}}
