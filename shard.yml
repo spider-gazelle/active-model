@@ -11,6 +11,9 @@ dependencies:
   db:
     github: crystal-lang/crystal-db
 
+  sanitize:
+    github: straight-shoota/sanitize
+
 development_dependencies:
   ameba:
     github: crystal-ameba/ameba

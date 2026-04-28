@@ -55,6 +55,8 @@ abstract class ActiveModel::Model
   # Stub methods to prevent compiler errors
   def apply_defaults; end
 
+  def sanitize_attributes; end
+
   def changed?; end
 
   def clear_changes_information; end
@@ -288,6 +290,19 @@ abstract class ActiveModel::Model
           self.{{name}} = ( {{data}} ).call if @{{name}}.nil?
         {% else %}
           self.{{name}} = {{data}} if @{{name}}.nil?
+        {% end %}
+      {% end %}
+    end
+
+    # Sanitize attribute values using configured policies
+    def sanitize_attributes
+      super
+      {% for name, opts in FIELDS %}
+        {% if opts[:sanitize] %}
+          %val = @{{ name }}
+          unless %val.nil?
+            @{{ name }} = ActiveModel::Sanitizer::{{ opts[:sanitize].id.stringify.upcase.id }}.process(%val)
+          end
         {% end %}
       {% end %}
     end
@@ -537,6 +552,17 @@ abstract class ActiveModel::Model
       def {{name}}=(value : {{opts[:klass]}})
         @{{name}}_assigned = true
 
+        # Apply sanitization policy before change tracking
+        {% if opts[:sanitize] %}
+          {% if opts[:klass].nilable? %}
+            if %_sanitize_val = value
+              value = ActiveModel::Sanitizer::{{ opts[:sanitize].id.stringify.upcase.id }}.process(%_sanitize_val)
+            end
+          {% else %}
+            value = ActiveModel::Sanitizer::{{ opts[:sanitize].id.stringify.upcase.id }}.process(value)
+          {% end %}
+        {% end %}
+
         if !@{{name}}_changed && @{{name}} != value
           @{{name}}_changed = true
 
@@ -576,6 +602,7 @@ abstract class ActiveModel::Model
       end
 
       apply_defaults
+      sanitize_attributes
       clear_changes_information
     end
 
@@ -818,6 +845,7 @@ abstract class ActiveModel::Model
     persistence = true,
     show = false,
     serialization_group = [] of Symbol,
+    sanitize = nil,
     **tags,
     &block
   )
@@ -828,6 +856,17 @@ abstract class ActiveModel::Model
     {% serialization_group = [serialization_group] if serialization_group.is_a?(SymbolLiteral) %}
     {% unless serialization_group.is_a? ArrayLiteral && serialization_group.all? &.is_a?(SymbolLiteral) %}
       {% raise "`serialization_group` expected to be an Array(Symbol) | Symbol, got #{serialization_group.class_name}" %}
+    {% end %}
+
+    # Validate sanitize option
+    {% if sanitize %}
+      {% valid_sanitize = [:basic, :common, :inline, :text] %}
+      {% unless valid_sanitize.includes?(sanitize) %}
+        {% raise "`sanitize` expected to be one of :basic, :common, :inline, :text — got :#{sanitize.id}" %}
+      {% end %}
+      {% unless resolved_type.stringify.includes?("String") %}
+        {% raise "`sanitize` option is only valid for String fields, got `#{resolved_type}` for `#{name.var}`" %}
+      {% end %}
     {% end %}
 
     # Assign instance variable to correct type
@@ -885,6 +924,7 @@ abstract class ActiveModel::Model
         serialization_group: serialization_group,
         tags:                tags.empty? == true ? nil : tags,
         type_signature:      type_signature,
+        sanitize:            sanitize,
       }
     %}
 
@@ -898,6 +938,7 @@ abstract class ActiveModel::Model
         serialization_group: serialization_group,
         tags:                tags.empty? == true ? nil : tags,
         type_signature:      type_signature,
+        sanitize:            sanitize,
       }
     %}
 
