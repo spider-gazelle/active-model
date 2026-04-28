@@ -13,6 +13,7 @@ dependencies:
 
   sanitize:
     github: straight-shoota/sanitize
+    version: ~> 0.1
 
 development_dependencies:
   ameba:
