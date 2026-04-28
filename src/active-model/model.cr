@@ -870,7 +870,8 @@ abstract class ActiveModel::Model
       {% unless valid_sanitize.includes?(sanitize) %}
         {% raise "`sanitize` expected to be one of :basic, :common, :inline, :text — got :#{sanitize.id}" %}
       {% end %}
-      {% unless resolved_type.stringify == "String" || resolved_type.stringify == "(String | Nil)" %}
+      {% non_nil = resolved_type.nilable? ? resolved_type.union_types.reject(&.nilable?).first : resolved_type %}
+      {% unless non_nil == String %}
         {% raise "`sanitize` option is only valid for String fields, got `#{resolved_type}` for `#{name.var}`" %}
       {% end %}
     {% end %}
