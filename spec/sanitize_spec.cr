@@ -225,4 +225,37 @@ describe "Sanitization" do
       model.content.should eq "Dirty"
     end
   end
+
+  describe "HTML entities and encoding edge cases" do
+    it "passes through entity-encoded markup in :text mode" do
+      model = SanitizedText.new(content: "&lt;b&gt;Hello&lt;/b&gt;")
+      # Entities are not real tags, so :text leaves them as-is
+      model.content.should eq "&lt;b&gt;Hello&lt;/b&gt;"
+    end
+
+    it "decodes numeric character references after stripping tags" do
+      model = SanitizedText.new(content: "<b>&#72;ello</b>")
+      model.content.should eq "Hello"
+    end
+
+    it "strips tags that mix entities and real markup" do
+      model = SanitizedText.new(content: "<script>alert(&quot;xss&quot;)</script>Safe")
+      model.content.should eq "Safe"
+    end
+
+    it "handles empty string without error" do
+      model = SanitizedText.new(content: "")
+      model.content.should eq ""
+    end
+
+    it "handles string with only whitespace" do
+      model = SanitizedText.new(content: "   ")
+      model.content.should eq ""
+    end
+
+    it "preserves safe entities in :common mode" do
+      model = SanitizedCommon.new(body: "<p>Tom &amp; Jerry</p>")
+      model.body.should eq "<p>Tom &amp; Jerry</p>"
+    end
+  end
 end

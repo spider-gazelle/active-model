@@ -294,7 +294,11 @@ abstract class ActiveModel::Model
       {% end %}
     end
 
-    # Sanitize attribute values using configured policies
+    # :nodoc:
+    # Sanitize attribute values using configured policies.
+    # NOTE: This is an internal method called by `after_initialize` and MUST be
+    # followed by `clear_changes_information` because it routes through the
+    # setter which marks attributes as assigned/changed as a side-effect.
     def sanitize_attributes
       super
       {% for name, opts in FIELDS %}
@@ -552,14 +556,16 @@ abstract class ActiveModel::Model
       def {{name}}=(value : {{opts[:klass]}})
         @{{name}}_assigned = true
 
-        # Apply sanitization policy before change tracking
+        # Apply sanitization policy before change tracking.
+        # NOTE: sanitization is idempotent, so values that were already sanitized
+        # (e.g. from a deserialized source model) are safe to sanitize again.
         {% if opts[:sanitize] %}
           {% if opts[:klass].nilable? %}
             if %_sanitize_val = value
-              value = ActiveModel::Sanitizer::{{ opts[:sanitize].id.stringify.upcase.id }}.process(%_sanitize_val)
+              value = ActiveModel::Sanitizer.{{ opts[:sanitize].id }}.process(%_sanitize_val)
             end
           {% else %}
-            value = ActiveModel::Sanitizer::{{ opts[:sanitize].id.stringify.upcase.id }}.process(value)
+            value = ActiveModel::Sanitizer.{{ opts[:sanitize].id }}.process(value)
           {% end %}
         {% end %}
 
