@@ -55,7 +55,7 @@ abstract class ActiveModel::Model
   # Stub methods to prevent compiler errors
   def apply_defaults; end
 
-  def sanitize_attributes; end
+  protected def sanitize_attributes; end
 
   def changed?; end
 
@@ -299,7 +299,7 @@ abstract class ActiveModel::Model
     # NOTE: This is an internal method called by `after_initialize` and MUST be
     # followed by `clear_changes_information` because it routes through the
     # setter which marks attributes as assigned/changed as a side-effect.
-    def sanitize_attributes
+    protected def sanitize_attributes
       super
       {% for name, opts in FIELDS %}
         {% if opts[:sanitize] %}
