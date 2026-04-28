@@ -127,6 +127,16 @@ describe "Sanitization" do
       model.name = "<em>world</em>"
       model.name.should eq "WORLD"
     end
+
+    it "sanitizes and applies setter block from JSON" do
+      model = SanitizedWithSetter.from_json(%({"name": "<b>hello</b>"}))
+      model.name.should eq "HELLO"
+    end
+
+    it "sanitizes and applies setter block from YAML" do
+      model = SanitizedWithSetter.from_yaml(%({"name": "<b>hello</b>"}))
+      model.name.should eq "HELLO"
+    end
   end
 
   describe "mixed sanitized and non-sanitized fields" do
