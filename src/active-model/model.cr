@@ -203,7 +203,7 @@ abstract class ActiveModel::Model
             {% end %}
           {% end %}
 
-          **_unknow_types
+          **_unknown_types
         )
           # Temporary hack as we migrate to AC5 / always define types for performance
           json_unmapped = Hash(String, JSON::Any).new({{nop_methods}}) { |key| raise KeyError.new "Missing hash key: #{key.inspect}" }
@@ -211,7 +211,7 @@ abstract class ActiveModel::Model
             {% for method in GROUP_METHODS[serialization_group] %}
               {% method_def = @type.methods.find { |meth| meth.name.symbolize == method.id.symbolize } %}
               {% if method_def && method_def.return_type.nil? %}
-                json_unmapped[{{method_def.name.stringify}}] = JSON.parse(_unknow_types[{{method_def.name.symbolize}}].to_json)
+                json_unmapped[{{method_def.name.stringify}}] = JSON.parse(_unknown_types[{{method_def.name.symbolize}}].to_json)
               {% end %}
             {% end %}
           {% end %}
@@ -352,23 +352,13 @@ abstract class ActiveModel::Model
       {% for name, opts in FIELDS %}
         {% if opts[:mass_assign] == true %}
           unless {{name.id}}.is_a?(Missing)
-            %value = {{name.id}}
-            # Convert empty strings to nil for field removal
-            {% if opts[:klass].nilable? %}
-              if %value.responds_to?(:empty?) && %value.empty?
-                self.{{name.id}} = nil
-              else
-                self.{{name.id}} = %value
-              end
-            {% else %}
-              self.{{name.id}} = %value
-            {% end %}
+            self.{{name.id}} = {{name.id}}
           end
         {% end %}
       {% end %}
     end
 
-    # Assign to mulitple attributes via `HTTP::Params`.
+    # Assign to multiple attributes via `HTTP::Params`.
     def assign_attributes(params : HTTP::Params | Hash(String, String) | Tuple(String, String))
       __from_object_params__(params)
 
@@ -380,17 +370,7 @@ abstract class ActiveModel::Model
       {% for name, opts in FIELDS %}
         {% if opts[:mass_assign] == true %}
           if model.{{name.id}}_assigned? || model.{{name.id}}_present?
-            %value = model.{{name.id}}
-            # Convert empty strings to nil for field removal
-            {% if opts[:klass].nilable? %}
-              if %value.responds_to?(:empty?) && %value.empty?
-                self.{{name.id}} = nil
-              else
-                self.{{name.id}} = %value
-              end
-            {% else %}
-              self.{{name.id}} = %value
-            {% end %}
+            self.{{name.id}} = model.{{name.id}}
           end
         {% end %}
       {% end %}
@@ -424,10 +404,6 @@ abstract class ActiveModel::Model
       @[JSON::Field(ignore: true)]
       @[YAML::Field(ignore: true)]
       getter? {{name}}_assigned = false
-
-      @[JSON::Field(ignore: true)]
-      @[YAML::Field(ignore: true)]
-      getter? {{name}}_removed = false
 
       # Include `{{ name }}` in the set of changed attributes, whether it has changed or not.
       def {{name}}_will_change! : Nil
@@ -514,7 +490,6 @@ abstract class ActiveModel::Model
         {% for name, index in FIELDS.keys %}
           @{{name}}_changed = false
           @{{name}}_assigned = false
-          @{{name}}_removed = false
           @{{name}}_was = nil
         {% end %}
       {% end %}
@@ -567,15 +542,6 @@ abstract class ActiveModel::Model
           @{{name}}_changed = true
 
           @{{name}}_was = @{{name}}
-        end
-
-        # Track if the value is being removed (set to nil or empty string)
-        if value.nil?
-          @{{name}}_removed = true
-        elsif value.responds_to?(:empty?) && value.empty?
-          @{{name}}_removed = true
-        else
-          @{{name}}_removed = false
         end
 
         {% if SETTERS[name] %}
@@ -652,17 +618,7 @@ abstract class ActiveModel::Model
       {% for name, opts in FIELDS %}
         {% if opts[:mass_assign] %}
           if model.{{name.id}}_present?
-            %value = model.{{name}}
-            # Convert empty strings to nil for field removal
-            {% if opts[:klass].nilable? %}
-              if %value.responds_to?(:empty?) && %value.empty?
-                self.{{name}} = nil
-              else
-                self.{{name}} = %value
-              end
-            {% else %}
-              self.{{name}} = %value
-            {% end %}
+            self.{{name}} = model.{{name}}
           end
         {% end %}
       {% end %}
@@ -676,17 +632,7 @@ abstract class ActiveModel::Model
       {% for name, opts in FIELDS %}
         {% if opts[:mass_assign] %}
           if model.{{name.id}}_present?
-            %value = model.{{name}}
-            # Convert empty strings to nil for field removal
-            {% if opts[:klass].nilable? %}
-              if %value.responds_to?(:empty?) && %value.empty?
-                self.{{name}} = nil
-              else
-                self.{{name}} = %value
-              end
-            {% else %}
-              self.{{name}} = %value
-            {% end %}
+            self.{{name}} = model.{{name}}
           end
         {% end %}
       {% end %}
@@ -700,17 +646,7 @@ abstract class ActiveModel::Model
       model = self.class.from_trusted_json(json)
       {% for name, opts in FIELDS %}
         if model.{{name.id}}_present?
-          %value = model.{{name}}
-          # Treat empty strings as nil to support field removal (only for nilable fields)
-          {% if opts[:klass].nilable? %}
-            if %value.responds_to?(:empty?) && %value.empty?
-              self.{{name}} = nil
-            else
-              self.{{name}} = %value
-            end
-          {% else %}
-            self.{{name}} = %value
-          {% end %}
+          self.{{name}} = model.{{name}}
         end
       {% end %}
 
@@ -722,17 +658,7 @@ abstract class ActiveModel::Model
       model = self.class.from_trusted_json(json, root)
       {% for name, opts in FIELDS %}
         if model.{{name.id}}_present?
-          %value = model.{{name}}
-          # Treat empty strings as nil to support field removal (only for nilable fields)
-          {% if opts[:klass].nilable? %}
-            if %value.responds_to?(:empty?) && %value.empty?
-              self.{{name}} = nil
-            else
-              self.{{name}} = %value
-            end
-          {% else %}
-            self.{{name}} = %value
-          {% end %}
+          self.{{name}} = model.{{name}}
         end
       {% end %}
 
@@ -743,21 +669,10 @@ abstract class ActiveModel::Model
     def assign_attributes_from_yaml(yaml)
       yaml = yaml.read_string(yaml.read_remaining) if yaml.responds_to? :read_remaining && yaml.responds_to? :read_string
       model = self.class.from_yaml(yaml)
-      data = YAML.parse(yaml).as_h
       {% for name, opts in FIELDS %}
         {% if opts[:mass_assign] %}
           if model.{{name.id}}_present?
-            %value = model.{{name}}
-            # Treat empty strings as nil to support field removal (only for nilable fields)
-            {% if opts[:klass].nilable? %}
-              if %value.responds_to?(:empty?) && %value.empty?
-                self.{{name}} = nil
-              else
-                self.{{name}} = %value
-              end
-            {% else %}
-              self.{{name}} = %value
-            {% end %}
+            self.{{name}} = model.{{name}}
           end
         {% end %}
       {% end %}
@@ -768,20 +683,9 @@ abstract class ActiveModel::Model
     def assign_attributes_from_trusted_yaml(yaml)
       yaml = yaml.read_string(yaml.read_remaining) if yaml.responds_to? :read_remaining && yaml.responds_to? :read_string
       model = self.class.from_trusted_yaml(yaml)
-      data = YAML.parse(yaml).as_h
       {% for name, opts in FIELDS %}
         if model.{{name.id}}_present?
-          %value = model.{{name}}
-          # Treat empty strings as nil to support field removal (only for nilable fields)
-          {% if opts[:klass].nilable? %}
-            if %value.responds_to?(:empty?) && %value.empty?
-              self.{{name}} = nil
-            else
-              self.{{name}} = %value
-            end
-          {% else %}
-            self.{{name}} = %value
-          {% end %}
+          self.{{name}} = model.{{name}}
         end
       {% end %}
 
