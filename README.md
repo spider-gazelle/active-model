@@ -160,3 +160,36 @@ m.to_some_json   # {"joined":0,"another":"ok"}
 m.to_most_json   # {"joined":0,"mates":0,"another":"ok"}
 m.to_method_json # {"joined":0,"foo":"foo"}
 ```
+
+#### Sanitization
+
+Use the `sanitize:` option on `attribute` to automatically strip or clean HTML content from string fields.
+Sanitization is applied on every write path — constructors, setters, JSON/YAML deserialization, and HTTP params.
+
+Supported policies:
+
+| Policy | Behaviour |
+|--------|-----------|
+| `:text` | Strips **all** HTML tags, returning plain text |
+| `:basic` | Allows basic formatting (`<b>`, `<i>`, etc.) |
+| `:inline` | Allows inline elements, strips block-level elements |
+| `:common` | Allows common safe HTML (`<p>`, `<b>`, `<i>`, etc.) |
+
+```/dev/null/example.cr#L1-12
+require "active-model"
+
+class Article < ActiveModel::Model
+  attribute title : String, sanitize: :text
+  attribute body : String?, sanitize: :common
+end
+
+article = Article.new(title: "<b>Hello</b> World")
+article.title # => "Hello World"
+
+article.body = "<p>Safe</p><script>alert('xss')</script>"
+article.body # => "<p>Safe</p>"
+```
+
+The `sanitize:` option is only valid for `String` (or `String?`) fields. Attempting to use it on other types will produce a compile-time error.
+
+

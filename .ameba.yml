@@ -1,0 +1,6 @@
+Lint/UselessAssign:
+  Excluded:
+    - spec/**/*
+
+Naming/BlockParameterName:
+  Enabled: false

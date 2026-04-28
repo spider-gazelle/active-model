@@ -55,6 +55,8 @@ abstract class ActiveModel::Model
   # Stub methods to prevent compiler errors
   def apply_defaults; end
 
+  protected def sanitize_attributes; end
+
   def changed?; end
 
   def clear_changes_information; end
@@ -201,7 +203,7 @@ abstract class ActiveModel::Model
             {% end %}
           {% end %}
 
-          **_unknow_types
+          **_unknown_types
         )
           # Temporary hack as we migrate to AC5 / always define types for performance
           json_unmapped = Hash(String, JSON::Any).new({{nop_methods}}) { |key| raise KeyError.new "Missing hash key: #{key.inspect}" }
@@ -209,7 +211,7 @@ abstract class ActiveModel::Model
             {% for method in GROUP_METHODS[serialization_group] %}
               {% method_def = @type.methods.find { |meth| meth.name.symbolize == method.id.symbolize } %}
               {% if method_def && method_def.return_type.nil? %}
-                json_unmapped[{{method_def.name.stringify}}] = JSON.parse(_unknow_types[{{method_def.name.symbolize}}].to_json)
+                json_unmapped[{{method_def.name.stringify}}] = JSON.parse(_unknown_types[{{method_def.name.symbolize}}].to_json)
               {% end %}
             {% end %}
           {% end %}
@@ -292,6 +294,23 @@ abstract class ActiveModel::Model
       {% end %}
     end
 
+    # :nodoc:
+    # Sanitize attribute values using configured policies.
+    # NOTE: This is an internal method called by `after_initialize` and MUST be
+    # followed by `clear_changes_information` because it routes through the
+    # setter which marks attributes as assigned/changed as a side-effect.
+    protected def sanitize_attributes
+      super
+      {% for name, opts in FIELDS %}
+        {% if opts[:sanitize] %}
+          %val = @{{ name }}
+          unless %val.nil?
+            self.{{ name }} = %val
+          end
+        {% end %}
+      {% end %}
+    end
+
     # Returns a `Hash` of all attribute values
     def attributes
       {
@@ -353,7 +372,7 @@ abstract class ActiveModel::Model
       {% end %}
     end
 
-    # Assign to mulitple attributes via `HTTP::Params`.
+    # Assign to multiple attributes via `HTTP::Params`.
     def assign_attributes(params : HTTP::Params | Hash(String, String) | Tuple(String, String))
       __from_object_params__(params)
 
@@ -537,6 +556,19 @@ abstract class ActiveModel::Model
       def {{name}}=(value : {{opts[:klass]}})
         @{{name}}_assigned = true
 
+        # Apply sanitization policy before change tracking.
+        # NOTE: sanitization is idempotent, so values that were already sanitized
+        # (e.g. from a deserialized source model) are safe to sanitize again.
+        {% if opts[:sanitize] %}
+          {% if opts[:klass].nilable? %}
+            if %_sanitize_val = value
+              value = ActiveModel::Sanitizer.{{ opts[:sanitize].id }}.process(%_sanitize_val)
+            end
+          {% else %}
+            value = ActiveModel::Sanitizer.{{ opts[:sanitize].id }}.process(value)
+          {% end %}
+        {% end %}
+
         if !@{{name}}_changed && @{{name}} != value
           @{{name}}_changed = true
 
@@ -576,6 +608,7 @@ abstract class ActiveModel::Model
       end
 
       apply_defaults
+      sanitize_attributes
       clear_changes_information
     end
 
@@ -818,6 +851,7 @@ abstract class ActiveModel::Model
     persistence = true,
     show = false,
     serialization_group = [] of Symbol,
+    sanitize = nil,
     **tags,
     &block
   )
@@ -828,6 +862,18 @@ abstract class ActiveModel::Model
     {% serialization_group = [serialization_group] if serialization_group.is_a?(SymbolLiteral) %}
     {% unless serialization_group.is_a? ArrayLiteral && serialization_group.all? &.is_a?(SymbolLiteral) %}
       {% raise "`serialization_group` expected to be an Array(Symbol) | Symbol, got #{serialization_group.class_name}" %}
+    {% end %}
+
+    # Validate sanitize option
+    {% if sanitize %}
+      {% valid_sanitize = [:basic, :common, :inline, :text] %}
+      {% unless valid_sanitize.includes?(sanitize) %}
+        {% raise "`sanitize` expected to be one of :basic, :common, :inline, :text — got :#{sanitize.id}" %}
+      {% end %}
+      {% non_nil = resolved_type.nilable? ? resolved_type.union_types.reject(&.nilable?).first : resolved_type %}
+      {% unless non_nil == String %}
+        {% raise "`sanitize` option is only valid for String fields, got `#{resolved_type}` for `#{name.var}`" %}
+      {% end %}
     {% end %}
 
     # Assign instance variable to correct type
@@ -885,6 +931,7 @@ abstract class ActiveModel::Model
         serialization_group: serialization_group,
         tags:                tags.empty? == true ? nil : tags,
         type_signature:      type_signature,
+        sanitize:            sanitize,
       }
     %}
 
@@ -898,6 +945,7 @@ abstract class ActiveModel::Model
         serialization_group: serialization_group,
         tags:                tags.empty? == true ? nil : tags,
         type_signature:      type_signature,
+        sanitize:            sanitize,
       }
     %}
 
