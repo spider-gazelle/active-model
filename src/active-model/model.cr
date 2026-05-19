@@ -875,11 +875,49 @@ abstract class ActiveModel::Model
         {% raise "`sanitize` expected to be one of :basic, :common, :inline, :text — got :#{sanitize.id}" %}
       {% end %}
       {% non_nil = resolved_type.nilable? ? resolved_type.union_types.reject(&.nilable?).first : resolved_type %}
-      {% sanitize_ok = non_nil == String ||
-                       ((non_nil < Array || non_nil < Set) && non_nil.type_vars.first == String) ||
-                       (non_nil < Hash && non_nil.type_vars[0] == String && non_nil.type_vars[1] == String) %}
+      # Walk the type tree iteratively. Accepted shapes:
+      #   - `String` (leaf)
+      #   - `JSON::Any` (handled as a single leaf; sanitizer walks `.raw` at runtime)
+      #   - `Array(T)` / `Set(T)` where T is itself accepted
+      #   - `Hash(String, V)` where V is itself accepted
+      # Types are finite trees, so the walk terminates.
+      {% sanitize_ok = true %}
+      {% if non_nil.stringify == "JSON::Any" %}
+        # JSON::Any accepted as a single leaf.
+      {% else %}
+        {% queue = [non_nil] %}
+        {% idx = 0 %}
+        # Bound walk depth at 32 — types are finite trees, and realistic
+        # nesting is shallow. This is far more than any sane attribute.
+        {% for _i in (0..32) %}
+          {% if idx < queue.size && sanitize_ok %}
+            {% t = queue[idx] %}
+            {% idx = idx + 1 %}
+            {% if t == String %}
+              # leaf — ok
+            {% elsif t.stringify == "JSON::Any" %}
+              # nested JSON::Any leaf — ok
+            {% elsif t < Array || t < Set %}
+              {% queue << t.type_vars.first %}
+            {% elsif t < Hash %}
+              {% if t.type_vars[0] != String %}
+                {% sanitize_ok = false %}
+              {% else %}
+                {% queue << t.type_vars[1] %}
+              {% end %}
+            {% else %}
+              {% sanitize_ok = false %}
+            {% end %}
+          {% end %}
+        {% end %}
+        # If we couldn't fully walk the type in 32 iterations, it's pathologically
+        # deep — reject rather than silently passing.
+        {% if idx < queue.size %}
+          {% sanitize_ok = false %}
+        {% end %}
+      {% end %}
       {% unless sanitize_ok %}
-        {% raise "`sanitize` option is only valid for String, Array(String), Set(String), or Hash(String, String) fields (and their nilable variants), got `#{resolved_type}` for `#{name.var}`" %}
+        {% raise "`sanitize` requires String, JSON::Any, or arbitrarily-nested Array/Set/Hash(String, _) with String leaves (plus nilable variants), got `#{resolved_type}` for `#{name.var}`" %}
       {% end %}
     {% end %}
 

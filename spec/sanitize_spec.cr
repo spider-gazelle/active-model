@@ -58,6 +58,48 @@ class SanitizedArrayWithSetter < ActiveModel::Model
   end
 end
 
+class SanitizedArrayOfArrays < ActiveModel::Model
+  attribute matrix : Array(Array(String)), sanitize: :text
+end
+
+class SanitizedArrayOfHashes < ActiveModel::Model
+  attribute records : Array(Hash(String, String)), sanitize: :common
+end
+
+class SanitizedHashOfArrays < ActiveModel::Model
+  attribute buckets : Hash(String, Array(String)), sanitize: :basic
+end
+
+class SanitizedHashOfHashes < ActiveModel::Model
+  attribute tree : Hash(String, Hash(String, String)), sanitize: :inline
+end
+
+class SanitizedSetInArray < ActiveModel::Model
+  attribute groups : Array(Set(String)), sanitize: :text
+end
+
+class SanitizedNilableArrayOfArrays < ActiveModel::Model
+  attribute matrix : Array(Array(String))?, sanitize: :text
+end
+
+class SanitizedNilableHashOfHashes < ActiveModel::Model
+  attribute tree : Hash(String, Hash(String, String))?, sanitize: :common
+end
+
+class SanitizedJsonAny < ActiveModel::Model
+  attribute payload : JSON::Any, sanitize: :text
+end
+
+class SanitizedNilableJsonAny < ActiveModel::Model
+  attribute payload : JSON::Any?, sanitize: :common
+end
+
+class SanitizedJsonAnyWithSetter < ActiveModel::Model
+  attribute payload : JSON::Any, sanitize: :text do |value|
+    JSON::Any.new({"wrapped" => value})
+  end
+end
+
 describe "Sanitization" do
   describe ":text policy" do
     it "strips all HTML tags on initialization" do
@@ -431,6 +473,229 @@ describe "Sanitization" do
     it "sanitizes from YAML" do
       model = SanitizedHashCommon.from_yaml(%({"fields": {"k": "<p>v</p><script>x</script>"}}))
       model.fields.should eq({"k" => "<p>v</p>"})
+    end
+  end
+
+  describe "Array(Array(String)) fields" do
+    it "sanitizes each leaf string on initialization" do
+      model = SanitizedArrayOfArrays.new(matrix: [["<b>a</b>", "<i>b</i>"], ["<em>c</em>"]])
+      model.matrix.should eq [["a", "b"], ["c"]]
+    end
+
+    it "sanitizes on direct setter assignment" do
+      model = SanitizedArrayOfArrays.new(matrix: [] of Array(String))
+      model.matrix = [["<b>x</b>"], ["<i>y</i>", "z"]]
+      model.matrix.should eq [["x"], ["y", "z"]]
+    end
+
+    it "handles empty outer and inner arrays" do
+      model = SanitizedArrayOfArrays.new(matrix: [[] of String, [] of String])
+      model.matrix.should eq [[] of String, [] of String]
+    end
+
+    it "sanitizes from JSON" do
+      model = SanitizedArrayOfArrays.from_json(%({"matrix": [["<b>a</b>"], ["<i>b</i>", "c"]]}))
+      model.matrix.should eq [["a"], ["b", "c"]]
+    end
+
+    it "sanitizes from YAML" do
+      model = SanitizedArrayOfArrays.from_yaml(%({"matrix": [["<b>a</b>"], ["<i>b</i>"]]}))
+      model.matrix.should eq [["a"], ["b"]]
+    end
+
+    it "tracks changes based on sanitized values" do
+      model = SanitizedArrayOfArrays.new(matrix: [["hi"]])
+      model.clear_changes_information
+      model.matrix = [["hi"]]
+      model.matrix_changed?.should be_false
+    end
+  end
+
+  describe "Array(Hash(String, String)) fields" do
+    it "sanitizes hash values on initialization" do
+      model = SanitizedArrayOfHashes.new(records: [{"k" => "<p>ok</p><script>x</script>"}])
+      model.records.should eq [{"k" => "<p>ok</p>"}]
+    end
+
+    it "sanitizes from JSON" do
+      model = SanitizedArrayOfHashes.from_json(%({"records": [{"k": "<p>v</p><script>x</script>"}]}))
+      model.records.should eq [{"k" => "<p>v</p>"}]
+    end
+  end
+
+  describe "Hash(String, Array(String)) fields" do
+    it "sanitizes inner array elements on initialization" do
+      model = SanitizedHashOfArrays.new(buckets: {"a" => ["<b>one</b>", "<i>two</i>"]})
+      model.buckets.should eq({"a" => ["<b>one</b>", "<i>two</i>"]})
+    end
+
+    it "does not sanitize keys" do
+      model = SanitizedHashOfArrays.new(buckets: {"<b>k</b>" => ["<script>x</script>v"]})
+      model.buckets.should eq({"<b>k</b>" => ["v"]})
+    end
+
+    it "sanitizes from JSON" do
+      model = SanitizedHashOfArrays.from_json(%({"buckets": {"a": ["<b>x</b>"]}}))
+      model.buckets.should eq({"a" => ["<b>x</b>"]})
+    end
+  end
+
+  describe "Hash(String, Hash(String, String)) fields" do
+    it "sanitizes the innermost values on initialization" do
+      # :inline strips block-level wrappers (keeping the text) and preserves inline tags.
+      model = SanitizedHashOfHashes.new(tree: {"outer" => {"inner" => "<p>block</p><b>bold</b>"}})
+      model.tree.should eq({"outer" => {"inner" => "block<b>bold</b>"}})
+    end
+
+    it "preserves keys at every level" do
+      model = SanitizedHashOfHashes.new(tree: {"<b>o</b>" => {"<i>i</i>" => "<script>x</script>safe"}})
+      model.tree.should eq({"<b>o</b>" => {"<i>i</i>" => "safe"}})
+    end
+
+    it "sanitizes from JSON" do
+      model = SanitizedHashOfHashes.from_json(%({"tree": {"o": {"i": "<p>block</p><b>bold</b>"}}}))
+      model.tree.should eq({"o" => {"i" => "block<b>bold</b>"}})
+    end
+  end
+
+  describe "Array(Set(String)) fields" do
+    it "sanitizes each set element on initialization" do
+      model = SanitizedSetInArray.new(groups: [Set{"<b>x</b>", "y"}, Set{"<i>z</i>"}])
+      model.groups.should eq [Set{"x", "y"}, Set{"z"}]
+    end
+
+    it "sanitizes from JSON" do
+      model = SanitizedSetInArray.from_json(%({"groups": [["<b>a</b>", "b"], ["<i>c</i>"]]}))
+      model.groups.should eq [Set{"a", "b"}, Set{"c"}]
+    end
+  end
+
+  describe "nilable nested fields" do
+    it "handles Array(Array(String))? with nil" do
+      model = SanitizedNilableArrayOfArrays.new
+      model.matrix.should be_nil
+    end
+
+    it "sanitizes Array(Array(String))? when present" do
+      model = SanitizedNilableArrayOfArrays.new(matrix: [["<b>x</b>"]])
+      model.matrix.should eq [["x"]]
+    end
+
+    it "sanitizes Array(Array(String))? from JSON" do
+      model = SanitizedNilableArrayOfArrays.from_json(%({"matrix": [["<b>a</b>"], ["b"]]}))
+      model.matrix.should eq [["a"], ["b"]]
+    end
+
+    it "handles Hash(String, Hash(String, String))? with nil" do
+      model = SanitizedNilableHashOfHashes.new
+      model.tree.should be_nil
+    end
+
+    it "sanitizes Hash(String, Hash(String, String))? when present" do
+      model = SanitizedNilableHashOfHashes.new(tree: {"o" => {"i" => "<p>v</p><script>x</script>"}})
+      model.tree.should eq({"o" => {"i" => "<p>v</p>"}})
+    end
+  end
+
+  describe "JSON::Any fields" do
+    it "sanitizes a string leaf on initialization" do
+      model = SanitizedJsonAny.new(payload: JSON::Any.new("<b>hello</b>"))
+      model.payload.as_s.should eq "hello"
+    end
+
+    it "leaves non-string scalars untouched" do
+      int_model = SanitizedJsonAny.new(payload: JSON::Any.new(42_i64))
+      int_model.payload.as_i64.should eq 42
+
+      float_model = SanitizedJsonAny.new(payload: JSON::Any.new(3.14))
+      float_model.payload.as_f.should eq 3.14
+
+      bool_model = SanitizedJsonAny.new(payload: JSON::Any.new(true))
+      bool_model.payload.as_bool.should be_true
+
+      nil_model = SanitizedJsonAny.new(payload: JSON::Any.new(nil))
+      nil_model.payload.raw.should be_nil
+    end
+
+    it "walks nested arrays and sanitizes string leaves" do
+      model = SanitizedJsonAny.from_json(%({"payload": ["<b>a</b>", "b", "<i>c</i>"]}))
+      model.payload.as_a.map(&.as_s).should eq ["a", "b", "c"]
+    end
+
+    it "walks nested objects, sanitizes string values, preserves keys" do
+      model = SanitizedJsonAny.from_json(%({"payload": {"<b>k</b>": "<b>v</b>"}}))
+      raw = model.payload.as_h
+      raw.keys.should eq ["<b>k</b>"]
+      raw["<b>k</b>"].as_s.should eq "v"
+    end
+
+    it "sanitizes only string elements in mixed-type arrays" do
+      model = SanitizedJsonAny.from_json(%({"payload": [1, "<b>x</b>", true, null]}))
+      arr = model.payload.as_a
+      arr[0].as_i64.should eq 1
+      arr[1].as_s.should eq "x"
+      arr[2].as_bool.should be_true
+      arr[3].raw.should be_nil
+    end
+
+    it "walks arbitrarily-nested JSON::Any" do
+      model = SanitizedJsonAny.from_json(%({"payload": {"a": {"b": [{"c": "<b>deep</b>"}]}}}))
+      model.payload["a"]["b"][0]["c"].as_s.should eq "deep"
+    end
+
+    it "sanitizes on direct setter assignment" do
+      model = SanitizedJsonAny.new(payload: JSON::Any.new("clean"))
+      model.payload = JSON::Any.new("<em>dirty</em>")
+      model.payload.as_s.should eq "dirty"
+    end
+
+    it "sanitizes from JSON" do
+      model = SanitizedJsonAny.from_json(%({"payload": "<b>hello</b>"}))
+      model.payload.as_s.should eq "hello"
+    end
+
+    it "round-trip sanitization is idempotent" do
+      first = SanitizedJsonAny.from_json(%({"payload": {"a": "<b>x</b>"}}))
+      second = SanitizedJsonAny.from_json(first.to_json)
+      first.payload.should eq second.payload
+    end
+
+    it "tracks changes based on sanitized values" do
+      model = SanitizedJsonAny.new(payload: JSON::Any.new("hello"))
+      model.clear_changes_information
+      model.payload = JSON::Any.new("hello")
+      model.payload_changed?.should be_false
+    end
+  end
+
+  describe "JSON::Any? fields" do
+    it "handles nil value" do
+      model = SanitizedNilableJsonAny.new
+      model.payload.should be_nil
+    end
+
+    it "sanitizes when present" do
+      model = SanitizedNilableJsonAny.new(payload: JSON::Any.new("<p>x</p><script>bad</script>"))
+      model.payload.not_nil!.as_s.should eq "<p>x</p>"
+    end
+
+    it "sanitizes from JSON" do
+      model = SanitizedNilableJsonAny.from_json(%({"payload": "<p>safe</p><script>x</script>"}))
+      model.payload.not_nil!.as_s.should eq "<p>safe</p>"
+    end
+
+    it "handles assigning nil" do
+      model = SanitizedNilableJsonAny.new(payload: JSON::Any.new("<b>x</b>"))
+      model.payload = nil
+      model.payload.should be_nil
+    end
+  end
+
+  describe "JSON::Any with custom setter block" do
+    it "runs setter block after sanitization" do
+      model = SanitizedJsonAnyWithSetter.new(payload: JSON::Any.new("<b>hi</b>"))
+      # Sanitization strips the tag, then the setter wraps it.
+      model.payload["wrapped"].as_s.should eq "hi"
     end
   end
 end
