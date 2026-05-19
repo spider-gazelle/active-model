@@ -163,7 +163,7 @@ m.to_method_json # {"joined":0,"foo":"foo"}
 
 #### Sanitization
 
-Use the `sanitize:` option on `attribute` to automatically strip or clean HTML content from string fields and collections of strings.
+Use the `sanitize:` option on `attribute` to automatically strip or clean HTML content from string fields and from arbitrarily-nested containers of strings.
 Sanitization is applied on every write path — constructors, setters, JSON/YAML deserialization, and HTTP params.
 
 Supported policies:
@@ -175,14 +175,37 @@ Supported policies:
 | `:inline` | Allows inline elements, strips block-level elements |
 | `:common` | Allows common safe HTML (`<p>`, `<b>`, `<i>`, etc.) |
 
-Supported field types:
+Supported field types (each may also be wrapped in `?` to make it nilable):
 
 | Type | Behaviour |
 |------|-----------|
-| `String` / `String?` | Sanitize the value |
-| `Array(String)` / `Array(String)?` | Sanitize each element; length is preserved (sanitized empties are not filtered) |
-| `Set(String)` / `Set(String)?` | Sanitize each element; the set may shrink if two values collapse to the same sanitized string |
-| `Hash(String, String)` / `Hash(String, String)?` | Sanitize each value; keys are left untouched |
+| `String` | Sanitize the value |
+| `JSON::Any` | Walk the tree; sanitize string leaves only. Non-string scalars (numbers, booleans, nulls) and object keys pass through |
+| `Array(T)` / `Deque(T)` | Sanitize each element; length and order are preserved |
+| `Set(T)` | Sanitize each element; the set may shrink if two values collapse to the same sanitized string |
+| `Hash(K, V)` | Sanitize each value; keys are left untouched (`K` can be any type) |
+| `Tuple(T1, T2, …)` / `NamedTuple(k1: V1, …)` | Sanitize each component, preserving positions/keys |
+| `StaticArray(T, N)` / `Slice(T)` | Sanitize each element; size preserved |
+| `Range(B, E)` | Sanitize either bound; `Nil` bounds pass through |
+| `Union` (e.g. `String \| Int32`) | At least one arm must be sanitizable; non-sanitizable arms pass through at runtime |
+
+Element types inside containers can themselves be any sanitizable type, so `Array(Hash(String, Array(String)))` is supported.
+
+Custom types can opt in by including `ActiveModel::Sanitizable` and implementing `sanitize(policy : Symbol) : self`:
+
+```/dev/null/sanitizable.cr#L1-12
+class Address
+  include ActiveModel::Sanitizable
+  property street : String
+
+  def initialize(@street : String); end
+
+  def sanitize(policy : Symbol) : self
+    @street = ActiveModel::Sanitizer.sanitize(@street, policy)
+    self
+  end
+end
+```
 
 ```/dev/null/example.cr#L1-18
 require "active-model"
@@ -203,6 +226,8 @@ article.body = "<p>Safe</p><script>alert('xss')</script>"
 article.body # => "<p>Safe</p>"
 ```
 
-The `sanitize:` option is only valid for the field types listed above. Attempting to use it on other types (e.g. `Int32`, `Array(Int32)`, `Hash(Symbol, String)`) produces a compile-time error.
+The `sanitize:` option is only valid for the field types listed above. Attempting to use it on a type with no sanitizable leaves (e.g. `Int32`, `Array(Int32)`, `Hash(String, Int32)`) produces a compile-time error.
+
+`Slice` and `StaticArray` don't have built-in `JSON::Serializable` / `YAML::Serializable` support, so they only work on the constructor / setter paths — not via `from_json` or `from_yaml`.
 
 

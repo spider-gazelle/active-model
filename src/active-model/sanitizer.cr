@@ -70,14 +70,15 @@ module ActiveModel::Sanitizer
     value
   end
 
-  # Recursive Slice(T). Mutable, fixed-size; mutate in place.
+  # Recursive Slice(T). Allocates a fresh slice — `Slice(T)` wraps a
+  # `Pointer(T)` and is aliased with the caller's storage, so mutating
+  # in place would also mutate any external reference to the same buffer.
   # NOTE: `Slice(UInt8)` (= `Bytes`) is the common Slice shape; UInt8 is not
   # sanitizable, so the macro-time walker rejects such attributes. This overload
   # is genuinely useful only for `Slice(String)` or nested sanitizable element
   # types.
   def self.sanitize(value : Slice(T), policy : Symbol) : Slice(T) forall T
-    value.size.times { |i| value[i] = sanitize(value[i], policy).as(T) }
-    value
+    Slice(T).new(value.size) { |i| sanitize(value[i], policy).as(T) }
   end
 
   # Recursive Range(B, E). Either bound may be `Nil` for open-ended ranges.

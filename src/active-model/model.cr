@@ -359,7 +359,7 @@ abstract class ActiveModel::Model
             %value = {{name.id}}
             # Convert empty strings to nil for field removal
             {% if opts[:klass].nilable? %}
-              if %value.responds_to?(:empty?) && %value.empty?
+              if !%value.is_a?(Range) && %value.responds_to?(:empty?) && %value.empty?
                 self.{{name.id}} = nil
               else
                 self.{{name.id}} = %value
@@ -387,7 +387,7 @@ abstract class ActiveModel::Model
             %value = model.{{name.id}}
             # Convert empty strings to nil for field removal
             {% if opts[:klass].nilable? %}
-              if %value.responds_to?(:empty?) && %value.empty?
+              if !%value.is_a?(Range) && %value.responds_to?(:empty?) && %value.empty?
                 self.{{name.id}} = nil
               else
                 self.{{name.id}} = %value
@@ -663,7 +663,7 @@ abstract class ActiveModel::Model
             %value = model.{{name}}
             # Convert empty strings to nil for field removal
             {% if opts[:klass].nilable? %}
-              if %value.responds_to?(:empty?) && %value.empty?
+              if !%value.is_a?(Range) && %value.responds_to?(:empty?) && %value.empty?
                 self.{{name}} = nil
               else
                 self.{{name}} = %value
@@ -687,7 +687,7 @@ abstract class ActiveModel::Model
             %value = model.{{name}}
             # Convert empty strings to nil for field removal
             {% if opts[:klass].nilable? %}
-              if %value.responds_to?(:empty?) && %value.empty?
+              if !%value.is_a?(Range) && %value.responds_to?(:empty?) && %value.empty?
                 self.{{name}} = nil
               else
                 self.{{name}} = %value
@@ -711,7 +711,7 @@ abstract class ActiveModel::Model
           %value = model.{{name}}
           # Treat empty strings as nil to support field removal (only for nilable fields)
           {% if opts[:klass].nilable? %}
-            if %value.responds_to?(:empty?) && %value.empty?
+            if !%value.is_a?(Range) && %value.responds_to?(:empty?) && %value.empty?
               self.{{name}} = nil
             else
               self.{{name}} = %value
@@ -733,7 +733,7 @@ abstract class ActiveModel::Model
           %value = model.{{name}}
           # Treat empty strings as nil to support field removal (only for nilable fields)
           {% if opts[:klass].nilable? %}
-            if %value.responds_to?(:empty?) && %value.empty?
+            if !%value.is_a?(Range) && %value.responds_to?(:empty?) && %value.empty?
               self.{{name}} = nil
             else
               self.{{name}} = %value
@@ -758,7 +758,7 @@ abstract class ActiveModel::Model
             %value = model.{{name}}
             # Treat empty strings as nil to support field removal (only for nilable fields)
             {% if opts[:klass].nilable? %}
-              if %value.responds_to?(:empty?) && %value.empty?
+              if !%value.is_a?(Range) && %value.responds_to?(:empty?) && %value.empty?
                 self.{{name}} = nil
               else
                 self.{{name}} = %value
@@ -782,7 +782,7 @@ abstract class ActiveModel::Model
           %value = model.{{name}}
           # Treat empty strings as nil to support field removal (only for nilable fields)
           {% if opts[:klass].nilable? %}
-            if %value.responds_to?(:empty?) && %value.empty?
+            if !%value.is_a?(Range) && %value.responds_to?(:empty?) && %value.empty?
               self.{{name}} = nil
             else
               self.{{name}} = %value

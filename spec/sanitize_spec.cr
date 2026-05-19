@@ -172,6 +172,10 @@ class SanitizedRangeOpenEnd < ActiveModel::Model
   attribute span : Range(String, Nil), sanitize: :inline
 end
 
+class SanitizedNilableRangeOpenBegin < ActiveModel::Model
+  attribute span : Range(Nil, String)?, sanitize: :common
+end
+
 class SanitizedUnionStringInt < ActiveModel::Model
   attribute value : String | Int32, sanitize: :text
 end
@@ -1007,6 +1011,15 @@ describe "Sanitization" do
       model.buffer[0].should eq "z"
       model.buffer[1].should eq "z"
     end
+
+    it "does not mutate the caller's buffer" do
+      # Slice wraps a Pointer, so an in-place sanitize would also mutate the
+      # caller's storage. Sanitizer.sanitize(Slice) must allocate a fresh slice.
+      buffer = Slice(String).new(2) { |i| "<b>x</b>" }
+      SanitizedSliceText.new(buffer: buffer)
+      buffer[0].should eq "<b>x</b>"
+      buffer[1].should eq "<b>x</b>"
+    end
   end
 
   describe "Range fields" do
@@ -1034,6 +1047,16 @@ describe "Sanitization" do
       model = SanitizedRangeOpenEnd.new(span: Range.new("<p>start</p><script>x</script>", nil, false))
       model.span.begin.should eq "start"
       model.span.end.should be_nil
+    end
+
+    it "does not call Range#empty? on a nilable beginless Range via assign_attributes" do
+      # Regression: the empty-string-removal logic in `assign_attributes` calls
+      # value.empty? when the field is nilable, and Range#empty? raises on
+      # beginless/endless ranges. The guard must skip Range values.
+      model = SanitizedNilableRangeOpenBegin.new
+      model.assign_attributes(span: Range.new(nil, "<p>x</p><script>bad</script>", false))
+      model.span.not_nil!.begin.should be_nil
+      model.span.not_nil!.end.should eq "<p>x</p>"
     end
   end
 
