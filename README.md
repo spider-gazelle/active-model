@@ -163,7 +163,7 @@ m.to_method_json # {"joined":0,"foo":"foo"}
 
 #### Sanitization
 
-Use the `sanitize:` option on `attribute` to automatically strip or clean HTML content from string fields.
+Use the `sanitize:` option on `attribute` to automatically strip or clean HTML content from string fields and collections of strings.
 Sanitization is applied on every write path — constructors, setters, JSON/YAML deserialization, and HTTP params.
 
 Supported policies:
@@ -175,21 +175,34 @@ Supported policies:
 | `:inline` | Allows inline elements, strips block-level elements |
 | `:common` | Allows common safe HTML (`<p>`, `<b>`, `<i>`, etc.) |
 
-```/dev/null/example.cr#L1-12
+Supported field types:
+
+| Type | Behaviour |
+|------|-----------|
+| `String` / `String?` | Sanitize the value |
+| `Array(String)` / `Array(String)?` | Sanitize each element; length is preserved (sanitized empties are not filtered) |
+| `Set(String)` / `Set(String)?` | Sanitize each element; the set may shrink if two values collapse to the same sanitized string |
+| `Hash(String, String)` / `Hash(String, String)?` | Sanitize each value; keys are left untouched |
+
+```/dev/null/example.cr#L1-18
 require "active-model"
 
 class Article < ActiveModel::Model
   attribute title : String, sanitize: :text
   attribute body : String?, sanitize: :common
+  attribute tags : Array(String), sanitize: :text
+  attribute keywords : Set(String), sanitize: :text
+  attribute metadata : Hash(String, String), sanitize: :common
 end
 
-article = Article.new(title: "<b>Hello</b> World")
+article = Article.new(title: "<b>Hello</b> World", tags: ["<b>one</b>", "<i>two</i>"])
 article.title # => "Hello World"
+article.tags  # => ["one", "two"]
 
 article.body = "<p>Safe</p><script>alert('xss')</script>"
 article.body # => "<p>Safe</p>"
 ```
 
-The `sanitize:` option is only valid for `String` (or `String?`) fields. Attempting to use it on other types will produce a compile-time error.
+The `sanitize:` option is only valid for the field types listed above. Attempting to use it on other types (e.g. `Int32`, `Array(Int32)`, `Hash(Symbol, String)`) produces a compile-time error.
 
 

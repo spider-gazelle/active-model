@@ -562,10 +562,10 @@ abstract class ActiveModel::Model
         {% if opts[:sanitize] %}
           {% if opts[:klass].nilable? %}
             if %_sanitize_val = value
-              value = ActiveModel::Sanitizer.{{ opts[:sanitize].id }}.process(%_sanitize_val)
+              value = ActiveModel::Sanitizer.sanitize(%_sanitize_val, {{ opts[:sanitize] }})
             end
           {% else %}
-            value = ActiveModel::Sanitizer.{{ opts[:sanitize].id }}.process(value)
+            value = ActiveModel::Sanitizer.sanitize(value, {{ opts[:sanitize] }})
           {% end %}
         {% end %}
 
@@ -865,14 +865,21 @@ abstract class ActiveModel::Model
     {% end %}
 
     # Validate sanitize option
+    # KEEP IN SYNC with overloads in `src/active-model/sanitizer.cr` —
+    # the set of types accepted here must match the `Sanitizer.sanitize`
+    # overloads, otherwise the macro accepts a type that fails to compile
+    # at the setter call site.
     {% if sanitize %}
       {% valid_sanitize = [:basic, :common, :inline, :text] %}
       {% unless valid_sanitize.includes?(sanitize) %}
         {% raise "`sanitize` expected to be one of :basic, :common, :inline, :text — got :#{sanitize.id}" %}
       {% end %}
       {% non_nil = resolved_type.nilable? ? resolved_type.union_types.reject(&.nilable?).first : resolved_type %}
-      {% unless non_nil == String %}
-        {% raise "`sanitize` option is only valid for String fields, got `#{resolved_type}` for `#{name.var}`" %}
+      {% sanitize_ok = non_nil == String ||
+                       ((non_nil < Array || non_nil < Set) && non_nil.type_vars.first == String) ||
+                       (non_nil < Hash && non_nil.type_vars[0] == String && non_nil.type_vars[1] == String) %}
+      {% unless sanitize_ok %}
+        {% raise "`sanitize` option is only valid for String, Array(String), Set(String), or Hash(String, String) fields (and their nilable variants), got `#{resolved_type}` for `#{name.var}`" %}
       {% end %}
     {% end %}
 
@@ -896,8 +903,16 @@ abstract class ActiveModel::Model
       ignore: {{ !persistence }},
       {{tags.double_splat}}
     )]
+    # NOTE: use `getter` (not `property`) for nilable types so that the setter
+    # defined later in `__create_initializer__` is the only setter on the field.
+    # Crystal's overload resolution silently fails to replace a `property`-defined
+    # setter with one of identical signature for *generic* nilable types
+    # (e.g. `Set(String)?`, `Array(String)?`, `Hash(String, String)?`), although
+    # it does work for non-generic ones like `String?`. Defining the setter only
+    # once via `__create_initializer__` ensures change tracking, sanitization,
+    # and custom setter blocks run uniformly across all types.
     {% if resolved_type.nilable? %}
-      property {{name.var}} : {{type_signature.id}}
+      getter {{name.var}} : {{type_signature.id}}
     {% else %}
       property! {{name.var}} : {{type_signature.id}}
     {% end %}

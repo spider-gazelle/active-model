@@ -28,6 +28,36 @@ class SanitizedMixed < ActiveModel::Model
   attribute plain : String?
 end
 
+class SanitizedArrayText < ActiveModel::Model
+  attribute tags : Array(String), sanitize: :text
+end
+
+class SanitizedNilableArrayCommon < ActiveModel::Model
+  attribute paragraphs : Array(String)?, sanitize: :common
+end
+
+class SanitizedSetText < ActiveModel::Model
+  attribute keywords : Set(String), sanitize: :text
+end
+
+class SanitizedNilableSetInline < ActiveModel::Model
+  attribute snippets : Set(String)?, sanitize: :inline
+end
+
+class SanitizedHashCommon < ActiveModel::Model
+  attribute fields : Hash(String, String), sanitize: :common
+end
+
+class SanitizedNilableHashBasic < ActiveModel::Model
+  attribute metadata : Hash(String, String)?, sanitize: :basic
+end
+
+class SanitizedArrayWithSetter < ActiveModel::Model
+  attribute tags : Array(String), sanitize: :text do |value|
+    value.try &.map(&.upcase)
+  end
+end
+
 describe "Sanitization" do
   describe ":text policy" do
     it "strips all HTML tags on initialization" do
@@ -256,6 +286,151 @@ describe "Sanitization" do
     it "preserves safe entities in :common mode" do
       model = SanitizedCommon.new(body: "<p>Tom &amp; Jerry</p>")
       model.body.should eq "<p>Tom &amp; Jerry</p>"
+    end
+  end
+
+  describe "Array(String) fields" do
+    it "sanitizes each element on initialization" do
+      model = SanitizedArrayText.new(tags: ["<b>one</b>", "<i>two</i>"])
+      model.tags.should eq ["one", "two"]
+    end
+
+    it "preserves array length when sanitization produces empty strings" do
+      model = SanitizedArrayText.new(tags: ["hello", "<script>x</script>"])
+      model.tags.should eq ["hello", ""]
+    end
+
+    it "sanitizes on direct setter assignment" do
+      model = SanitizedArrayText.new(tags: ["clean"])
+      model.tags = ["<em>dirty</em>", "ok"]
+      model.tags.should eq ["dirty", "ok"]
+    end
+
+    it "handles empty array without error" do
+      model = SanitizedArrayText.new(tags: [] of String)
+      model.tags.should eq [] of String
+    end
+
+    it "sanitizes from JSON" do
+      model = SanitizedArrayText.from_json(%({"tags": ["<b>a</b>", "<i>b</i>"]}))
+      model.tags.should eq ["a", "b"]
+    end
+
+    it "sanitizes from YAML" do
+      model = SanitizedArrayText.from_yaml(%({"tags": ["<b>a</b>", "<i>b</i>"]}))
+      model.tags.should eq ["a", "b"]
+    end
+
+    it "sanitizes when assigning from JSON" do
+      model = SanitizedArrayText.new(tags: ["clean"])
+      model.clear_changes_information
+      model.assign_attributes_from_json(%({"tags": ["<b>updated</b>"]}))
+      model.tags.should eq ["updated"]
+    end
+
+    it "tracks changes based on sanitized values" do
+      model = SanitizedArrayText.new(tags: ["hello"])
+      model.clear_changes_information
+
+      model.tags = ["hello"]
+      model.tags_changed?.should be_false
+    end
+
+    it "handles nilable Array(String)? with nil value" do
+      model = SanitizedNilableArrayCommon.new
+      model.paragraphs.should be_nil
+    end
+
+    it "sanitizes nilable Array(String)? from JSON" do
+      model = SanitizedNilableArrayCommon.from_json(%({"paragraphs": ["<p>safe</p>", "<script>xss</script>"]}))
+      model.paragraphs.should eq ["<p>safe</p>", ""]
+    end
+
+    it "runs custom setter block after sanitization" do
+      model = SanitizedArrayWithSetter.new(tags: ["<b>hello</b>", "world"])
+      model.tags.should eq ["HELLO", "WORLD"]
+    end
+  end
+
+  describe "Set(String) fields" do
+    it "sanitizes each element on initialization" do
+      model = SanitizedSetText.new(keywords: Set{"<b>foo</b>", "bar"})
+      model.keywords.should eq Set{"foo", "bar"}
+    end
+
+    it "deduplicates when sanitization collapses two values to the same string" do
+      model = SanitizedSetText.new(keywords: Set{"<b>foo</b>", "foo"})
+      model.keywords.size.should eq 1
+      model.keywords.should eq Set{"foo"}
+    end
+
+    it "sanitizes on direct setter assignment" do
+      model = SanitizedSetText.new(keywords: Set{"clean"})
+      model.keywords = Set{"<em>dirty</em>", "ok"}
+      model.keywords.should eq Set{"dirty", "ok"}
+    end
+
+    it "handles empty set without error" do
+      model = SanitizedSetText.new(keywords: Set(String).new)
+      model.keywords.empty?.should be_true
+    end
+
+    it "sanitizes nilable Set(String)? on initialization" do
+      model = SanitizedNilableSetInline.new(snippets: Set{"<p>block</p>", "<b>inline</b>"})
+      model.snippets.should eq Set{"block", "<b>inline</b>"}
+    end
+
+    it "handles nilable Set(String)? with nil value" do
+      model = SanitizedNilableSetInline.new
+      model.snippets.should be_nil
+    end
+
+    it "sanitizes from JSON" do
+      model = SanitizedSetText.from_json(%({"keywords": ["<b>a</b>", "<i>b</i>"]}))
+      model.keywords.should eq Set{"a", "b"}
+    end
+
+    it "sanitizes from YAML" do
+      model = SanitizedSetText.from_yaml(%({"keywords": ["<b>a</b>", "<i>b</i>"]}))
+      model.keywords.should eq Set{"a", "b"}
+    end
+  end
+
+  describe "Hash(String, String) fields" do
+    it "sanitizes values but not keys" do
+      model = SanitizedHashCommon.new(fields: {"<b>k</b>" => "<p>v</p><script>x</script>"})
+      model.fields.should eq({"<b>k</b>" => "<p>v</p>"})
+    end
+
+    it "sanitizes each value on initialization" do
+      model = SanitizedHashCommon.new(fields: {"a" => "<p>one</p>", "b" => "<p>two</p><script>x</script>"})
+      model.fields.should eq({"a" => "<p>one</p>", "b" => "<p>two</p>"})
+    end
+
+    it "sanitizes on direct setter assignment" do
+      model = SanitizedHashCommon.new(fields: {} of String => String)
+      model.fields = {"k" => "<p>v</p><script>x</script>"}
+      model.fields.should eq({"k" => "<p>v</p>"})
+    end
+
+    it "handles empty hash without error" do
+      model = SanitizedHashCommon.new(fields: {} of String => String)
+      model.fields.empty?.should be_true
+    end
+
+    it "handles nilable Hash(String, String)? with nil value" do
+      model = SanitizedNilableHashBasic.new
+      model.metadata.should be_nil
+    end
+
+    it "sanitizes nilable Hash(String, String)? from JSON" do
+      model = SanitizedNilableHashBasic.from_json(%({"metadata": {"a": "<b>bold</b>", "b": "<script>x</script>"}}))
+      model.metadata.should eq({"a" => "<b>bold</b>", "b" => ""})
+    end
+
+    it "sanitizes from YAML" do
+      model = SanitizedHashCommon.from_yaml(%({"fields": {"k": "<p>v</p><script>x</script>"}}))
+      model.fields.should eq({"k" => "<p>v</p>"})
     end
   end
 end
