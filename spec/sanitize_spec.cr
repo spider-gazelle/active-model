@@ -148,6 +148,73 @@ class SanitizedNilableNamedTuple < ActiveModel::Model
   attribute fields : NamedTuple(name: String, body: String)?, sanitize: :inline
 end
 
+class SanitizedStaticArrayText < ActiveModel::Model
+  attribute slots : StaticArray(String, 3), sanitize: :text
+end
+
+class SanitizedNilableStaticArrayCommon < ActiveModel::Model
+  attribute slots : StaticArray(String, 2)?, sanitize: :common
+end
+
+class SanitizedSliceText < ActiveModel::Model
+  attribute buffer : Slice(String), sanitize: :text
+end
+
+class SanitizedRangeStrings < ActiveModel::Model
+  attribute span : Range(String, String), sanitize: :text
+end
+
+class SanitizedRangeOpenBegin < ActiveModel::Model
+  attribute span : Range(Nil, String), sanitize: :common
+end
+
+class SanitizedRangeOpenEnd < ActiveModel::Model
+  attribute span : Range(String, Nil), sanitize: :inline
+end
+
+class SanitizedUnionStringInt < ActiveModel::Model
+  attribute value : String | Int32, sanitize: :text
+end
+
+class SanitizedUnionStringArray < ActiveModel::Model
+  attribute value : String | Array(String), sanitize: :common
+end
+
+class SanitizedArrayOfUnion < ActiveModel::Model
+  attribute items : Array(String | Int32), sanitize: :text
+end
+
+class SanitizedNilableUnion < ActiveModel::Model
+  attribute value : (String | Int32)?, sanitize: :basic
+end
+
+class SanitizableAddress
+  include ActiveModel::Sanitizable
+  property street : String
+  property city : String
+
+  def initialize(@street : String, @city : String)
+  end
+
+  def sanitize(policy : Symbol) : self
+    @street = ActiveModel::Sanitizer.sanitize(@street, policy)
+    @city = ActiveModel::Sanitizer.sanitize(@city, policy)
+    self
+  end
+
+  def ==(other : SanitizableAddress)
+    street == other.street && city == other.city
+  end
+end
+
+class SanitizedCustomType < ActiveModel::Model
+  attribute address : SanitizableAddress, sanitize: :text
+end
+
+class SanitizedArrayOfCustom < ActiveModel::Model
+  attribute addresses : Array(SanitizableAddress), sanitize: :text
+end
+
 describe "Sanitization" do
   describe ":text policy" do
     it "strips all HTML tags on initialization" do
@@ -877,6 +944,173 @@ describe "Sanitization" do
       model.clear_changes_information
       model.fields = {a: "<p>hi</p>", b: "<p>ok</p>"}
       model.fields_changed?.should be_false
+    end
+  end
+
+  describe "StaticArray fields" do
+    it "sanitizes each element on initialization" do
+      slots = StaticArray(String, 3).new { |i| ["<b>a</b>", "<b>b</b>", "<b>c</b>"][i] }
+      model = SanitizedStaticArrayText.new(slots: slots)
+      model.slots[0].should eq "a"
+      model.slots[1].should eq "b"
+      model.slots[2].should eq "c"
+    end
+
+    it "sanitizes on direct setter assignment" do
+      model = SanitizedStaticArrayText.new(slots: StaticArray(String, 3).new { |i| "x" })
+      model.clear_changes_information
+      model.slots = StaticArray(String, 3).new { |i| "<b>y#{i}</b>" }
+      model.slots[0].should eq "y0"
+      model.slots[1].should eq "y1"
+      model.slots[2].should eq "y2"
+    end
+
+    it "preserves the fixed size" do
+      slots = StaticArray(String, 3).new { |i| "<b>v</b>" }
+      model = SanitizedStaticArrayText.new(slots: slots)
+      model.slots.size.should eq 3
+    end
+
+    it "handles nilable StaticArray with nil" do
+      model = SanitizedNilableStaticArrayCommon.new
+      model.slots.should be_nil
+    end
+
+    it "sanitizes nilable StaticArray when set" do
+      slots = StaticArray(String, 2).new { |i| "<p>x</p><script>bad</script>" }
+      model = SanitizedNilableStaticArrayCommon.new(slots: slots)
+      model.slots.not_nil!.size.should eq 2
+      model.slots.not_nil![0].should eq "<p>x</p>"
+      model.slots.not_nil![1].should eq "<p>x</p>"
+    end
+  end
+
+  describe "Slice(String) fields" do
+    it "sanitizes each element on initialization" do
+      buffer = Slice(String).new(3) { |i| ["<b>a</b>", "<b>b</b>", "<b>c</b>"][i] }
+      model = SanitizedSliceText.new(buffer: buffer)
+      model.buffer[0].should eq "a"
+      model.buffer[1].should eq "b"
+      model.buffer[2].should eq "c"
+    end
+
+    it "preserves the slice size" do
+      buffer = Slice(String).new(4) { |i| "<b>x</b>" }
+      model = SanitizedSliceText.new(buffer: buffer)
+      model.buffer.size.should eq 4
+    end
+
+    it "sanitizes on direct setter assignment" do
+      model = SanitizedSliceText.new(buffer: Slice(String).new(2) { |i| "ok" })
+      model.clear_changes_information
+      model.buffer = Slice(String).new(2) { |i| "<em>z</em>" }
+      model.buffer[0].should eq "z"
+      model.buffer[1].should eq "z"
+    end
+  end
+
+  describe "Range fields" do
+    it "sanitizes both bounds when present" do
+      model = SanitizedRangeStrings.new(span: Range.new("<b>a</b>", "<b>z</b>"))
+      model.span.begin.should eq "a"
+      model.span.end.should eq "z"
+    end
+
+    it "preserves the exclusive? flag" do
+      excl = SanitizedRangeStrings.new(span: Range.new("<b>a</b>", "<b>z</b>", true))
+      excl.span.exclusive?.should be_true
+
+      incl = SanitizedRangeStrings.new(span: Range.new("<b>a</b>", "<b>z</b>", false))
+      incl.span.exclusive?.should be_false
+    end
+
+    it "passes through nil begin for open-ended Range(Nil, String)" do
+      model = SanitizedRangeOpenBegin.new(span: Range.new(nil, "<p>top</p><script>x</script>", false))
+      model.span.begin.should be_nil
+      model.span.end.should eq "<p>top</p>"
+    end
+
+    it "passes through nil end for open-ended Range(String, Nil)" do
+      model = SanitizedRangeOpenEnd.new(span: Range.new("<p>start</p><script>x</script>", nil, false))
+      model.span.begin.should eq "start"
+      model.span.end.should be_nil
+    end
+  end
+
+  describe "Union types with at least one sanitizable arm" do
+    it "sanitizes when the value is the String arm" do
+      model = SanitizedUnionStringInt.new(value: "<b>hello</b>")
+      model.value.should eq "hello"
+    end
+
+    it "passes through the Int32 arm unchanged" do
+      model = SanitizedUnionStringInt.new(value: 42)
+      model.value.should eq 42
+    end
+
+    it "sanitizes when the value is the Array(String) arm" do
+      model = SanitizedUnionStringArray.new(value: ["<p>a</p>", "<p>b</p><script>bad</script>"])
+      result = model.value.as(Array(String))
+      result[0].should eq "<p>a</p>"
+      result[1].should eq "<p>b</p>"
+    end
+
+    it "sanitizes when the value is the String arm of a String|Array union" do
+      model = SanitizedUnionStringArray.new(value: "<p>solo</p>")
+      model.value.should eq "<p>solo</p>"
+    end
+
+    it "sanitizes only String elements inside Array(String | Int32)" do
+      model = SanitizedArrayOfUnion.new(items: ["<b>x</b>", 1, "<i>y</i>", 2])
+      model.items[0].should eq "x"
+      model.items[1].should eq 1
+      model.items[2].should eq "y"
+      model.items[3].should eq 2
+    end
+
+    it "handles nilable union with nil" do
+      model = SanitizedNilableUnion.new
+      model.value.should be_nil
+    end
+
+    it "sanitizes the String arm of a nilable union" do
+      model = SanitizedNilableUnion.new(value: "<b>x</b>")
+      model.value.should eq "<b>x</b>"
+    end
+
+    it "passes through the Int32 arm of a nilable union" do
+      model = SanitizedNilableUnion.new(value: 7)
+      model.value.should eq 7
+    end
+  end
+
+  describe "User-defined Sanitizable types" do
+    it "calls user-defined sanitize on initialization" do
+      address = SanitizableAddress.new("<b>123 Main</b>", "<b>Springfield</b>")
+      model = SanitizedCustomType.new(address: address)
+      model.address.street.should eq "123 Main"
+      model.address.city.should eq "Springfield"
+    end
+
+    it "calls user-defined sanitize on setter assignment" do
+      address = SanitizableAddress.new("ok", "ok")
+      model = SanitizedCustomType.new(address: address)
+      model.clear_changes_information
+      model.address = SanitizableAddress.new("<i>new</i>", "<i>place</i>")
+      model.address.street.should eq "new"
+      model.address.city.should eq "place"
+    end
+
+    it "delegates inside Array(Sanitizable)" do
+      addresses = [
+        SanitizableAddress.new("<b>1</b>", "<b>a</b>"),
+        SanitizableAddress.new("<b>2</b>", "<b>b</b>"),
+      ]
+      model = SanitizedArrayOfCustom.new(addresses: addresses)
+      model.addresses[0].street.should eq "1"
+      model.addresses[0].city.should eq "a"
+      model.addresses[1].street.should eq "2"
+      model.addresses[1].city.should eq "b"
     end
   end
 end

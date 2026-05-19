@@ -1,6 +1,15 @@
 require "json"
 require "sanitize"
 
+# Opt-in interface for user-defined types that want to participate in
+# `attribute foo : MyType, sanitize: :text` declarations. Include this
+# module and implement `sanitize(policy : Symbol) : self`. The macro-time
+# type walker accepts any type `<` this module, and the runtime delegates
+# to the type's own `sanitize` method.
+module ActiveModel::Sanitizable
+  abstract def sanitize(policy : Symbol) : self
+end
+
 module ActiveModel::Sanitizer
   class_getter(common) { Sanitize::Policy::HTMLSanitizer.common }
   class_getter(basic) { Sanitize::Policy::HTMLSanitizer.basic }
@@ -55,6 +64,29 @@ module ActiveModel::Sanitizer
     result
   end
 
+  # Recursive StaticArray(T, N). Stack-allocated, fixed-size; mutate in place.
+  def self.sanitize(value : StaticArray(T, N), policy : Symbol) : StaticArray(T, N) forall T, N
+    value.size.times { |i| value[i] = sanitize(value[i], policy).as(T) }
+    value
+  end
+
+  # Recursive Slice(T). Mutable, fixed-size; mutate in place.
+  # NOTE: `Slice(UInt8)` (= `Bytes`) is the common Slice shape; UInt8 is not
+  # sanitizable, so the macro-time walker rejects such attributes. This overload
+  # is genuinely useful only for `Slice(String)` or nested sanitizable element
+  # types.
+  def self.sanitize(value : Slice(T), policy : Symbol) : Slice(T) forall T
+    value.size.times { |i| value[i] = sanitize(value[i], policy).as(T) }
+    value
+  end
+
+  # Recursive Range(B, E). Either bound may be `Nil` for open-ended ranges.
+  def self.sanitize(value : Range(B, E), policy : Symbol) : Range(B, E) forall B, E
+    new_begin = value.begin.nil? ? value.begin : sanitize(value.begin.not_nil!, policy).as(B)
+    new_end = value.end.nil? ? value.end : sanitize(value.end.not_nil!, policy).as(E)
+    Range.new(new_begin, new_end, value.exclusive?)
+  end
+
   # Recursive Tuple(...). Delegates to the instance method on the struct
   # so we can use `T[i]` macro reflection per-position — `Tuple#map` would
   # collapse each element to the union of all positional types.
@@ -82,6 +114,35 @@ module ActiveModel::Sanitizer
       result = Hash(String, JSON::Any).new(initial_capacity: raw.size)
       raw.each { |k, v| result[k] = sanitize(v, policy) }
       JSON::Any.new(result)
+    else
+      value
+    end
+  end
+
+  # User-defined types opt in by including `ActiveModel::Sanitizable`.
+  def self.sanitize(value : ::ActiveModel::Sanitizable, policy : Symbol)
+    value.sanitize(policy)
+  end
+
+  # Catch-all for union types. The strongly-typed overloads above win for
+  # concrete static types; this fires only when `value`'s compile-time type
+  # is a union — which the macro walker has verified contains at least one
+  # sanitizable arm. Used both for top-level union attributes (e.g.
+  # `String | Int32`) and for union elements inside accepted containers
+  # (e.g. `Array(String | Int32)`). The recursive `sanitize(value, policy)`
+  # calls dispatch back to the strongly-typed overloads because Crystal
+  # narrows `value`'s type inside each `is_a?` branch.
+  def self.sanitize(value, policy : Symbol)
+    if value.is_a?(String)
+      resolve_policy(policy).process(value)
+    elsif value.is_a?(JSON::Any)
+      sanitize(value, policy)
+    elsif value.is_a?(::ActiveModel::Sanitizable)
+      value.sanitize(policy)
+    elsif value.is_a?(Array) || value.is_a?(Set) || value.is_a?(Deque) ||
+          value.is_a?(Hash) || value.is_a?(Tuple) || value.is_a?(NamedTuple) ||
+          value.is_a?(StaticArray) || value.is_a?(Slice) || value.is_a?(Range)
+      sanitize(value, policy)
     else
       value
     end

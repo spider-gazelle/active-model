@@ -578,7 +578,9 @@ abstract class ActiveModel::Model
         # Track if the value is being removed (set to nil or empty string)
         if value.nil?
           @{{name}}_removed = true
-        elsif value.responds_to?(:empty?) && value.empty?
+        elsif !value.is_a?(Range) && value.responds_to?(:empty?) && value.empty?
+          # Range#empty? raises on beginless/endless ranges and "empty range"
+          # is not a "removed value" anyway, so skip it.
           @{{name}}_removed = true
         else
           @{{name}}_removed = false
@@ -874,58 +876,101 @@ abstract class ActiveModel::Model
       {% unless valid_sanitize.includes?(sanitize) %}
         {% raise "`sanitize` expected to be one of :basic, :common, :inline, :text — got :#{sanitize.id}" %}
       {% end %}
-      {% non_nil = resolved_type.nilable? ? resolved_type.union_types.reject(&.nilable?).first : resolved_type %}
       # Walk the type tree iteratively. Accepted shapes:
       #   - `String` (leaf)
       #   - `JSON::Any` (handled as a single leaf; sanitizer walks `.raw` at runtime)
-      #   - `Array(T)` / `Set(T)` / `Deque(T)` where T is itself accepted
+      #   - Any type including `ActiveModel::Sanitizable` (user opt-in leaf)
+      #   - `Array(T)` / `Set(T)` / `Deque(T)` / `Slice(T)` / `StaticArray(T, N)`
+      #     where T is itself accepted
       #   - `Hash(K, V)` where V is itself accepted (K is unconstrained — keys
       #     are identifiers and are not sanitized)
+      #   - `Range(B, E)` where B and E are each itself accepted (Nil bounds OK)
       #   - `Tuple(T1, T2, ...)` where every Tᵢ is itself accepted
       #   - `NamedTuple(k1: V1, k2: V2, ...)` where every Vᵢ is itself accepted
+      #   - Union types where at least one arm is itself accepted; other arms
+      #     are silently passed through at runtime (e.g. `String | Int32`)
       # Types are finite trees, so the walk terminates.
       {% sanitize_ok = true %}
-      {% if non_nil.stringify == "JSON::Any" %}
-        # JSON::Any accepted as a single leaf.
-      {% else %}
-        {% queue = [non_nil] %}
-        {% idx = 0 %}
-        # Bound walk depth at 64 — types are finite trees, and realistic
-        # nesting is shallow. NamedTuples with many keys expand the queue
-        # by one entry per key, so the bound is loose for safety.
-        {% for _i in (0..64) %}
-          {% if idx < queue.size && sanitize_ok %}
-            {% t = queue[idx] %}
-            {% idx = idx + 1 %}
-            {% if t == String %}
-              # leaf — ok
-            {% elsif t.stringify == "JSON::Any" %}
-              # nested JSON::Any leaf — ok
-            {% elsif t < Array || t < Set || t < Deque %}
-              {% queue << t.type_vars.first %}
-            {% elsif t < Hash %}
-              {% queue << t.type_vars[1] %}
-            {% elsif t < Tuple %}
-              {% for tv in t.type_vars %}
-                {% queue << tv %}
+      {% queue = [resolved_type] %}
+      {% idx = 0 %}
+      # Bound walk depth at 64 — types are finite trees, and realistic
+      # nesting is shallow. NamedTuples with many keys expand the queue
+      # by one entry per key, so the bound is loose for safety.
+      {% for _i in (0..64) %}
+        {% if idx < queue.size && sanitize_ok %}
+          {% t = queue[idx] %}
+          {% idx = idx + 1 %}
+          {% if t.union? %}
+            # Union: at least one arm must be a sanitizable shape;
+            # other arms are silently accepted as runtime passthroughs.
+            {% any_sanitizable_arm = false %}
+            {% for arm in t.union_types %}
+              {% if arm == String %}
+                {% any_sanitizable_arm = true %}
+              {% elsif arm.stringify == "JSON::Any" %}
+                {% any_sanitizable_arm = true %}
+              {% elsif arm < ::ActiveModel::Sanitizable %}
+                {% any_sanitizable_arm = true %}
+              {% elsif arm < Array || arm < Set || arm < Deque || arm < Slice || arm < StaticArray %}
+                {% queue << arm.type_vars.first %}
+                {% any_sanitizable_arm = true %}
+              {% elsif arm < Hash %}
+                {% queue << arm.type_vars[1] %}
+                {% any_sanitizable_arm = true %}
+              {% elsif arm < Tuple %}
+                {% for tv in arm.type_vars %}{% queue << tv %}{% end %}
+                {% any_sanitizable_arm = true %}
+              {% elsif arm < NamedTuple %}
+                {% for k in arm.keys %}{% queue << arm[k] %}{% end %}
+                {% any_sanitizable_arm = true %}
+              {% elsif arm < Range %}
+                {% queue << arm.type_vars[0] %}
+                {% queue << arm.type_vars[1] %}
+                {% any_sanitizable_arm = true %}
+              {% elsif arm.union? %}
+                {% queue << arm %}
+                {% any_sanitizable_arm = true %}
+              {% else %}
+                # passthrough arm — accepted silently
               {% end %}
-            {% elsif t < NamedTuple %}
-              {% for k in t.keys %}
-                {% queue << t[k] %}
-              {% end %}
-            {% else %}
-              {% sanitize_ok = false %}
             {% end %}
+            {% unless any_sanitizable_arm %}{% sanitize_ok = false %}{% end %}
+          {% elsif t == String %}
+            # leaf — ok
+          {% elsif t == Nil %}
+            # passthrough leaf — appears in open-ended Range bounds and as a
+            # union arm; runtime catch-all returns Nil values unchanged.
+          {% elsif t.stringify == "JSON::Any" %}
+            # leaf — ok
+          {% elsif t < ::ActiveModel::Sanitizable %}
+            # user opt-in leaf — runtime delegates to value.sanitize(policy)
+          {% elsif t < Array || t < Set || t < Deque || t < Slice || t < StaticArray %}
+            {% queue << t.type_vars.first %}
+          {% elsif t < Hash %}
+            {% queue << t.type_vars[1] %}
+          {% elsif t < Tuple %}
+            {% for tv in t.type_vars %}
+              {% queue << tv %}
+            {% end %}
+          {% elsif t < NamedTuple %}
+            {% for k in t.keys %}
+              {% queue << t[k] %}
+            {% end %}
+          {% elsif t < Range %}
+            {% queue << t.type_vars[0] %}
+            {% queue << t.type_vars[1] %}
+          {% else %}
+            {% sanitize_ok = false %}
           {% end %}
         {% end %}
-        # If we couldn't fully walk the type in 64 iterations, it's pathologically
-        # deep — reject rather than silently passing.
-        {% if idx < queue.size %}
-          {% sanitize_ok = false %}
-        {% end %}
+      {% end %}
+      # If we couldn't fully walk the type in 64 iterations, it's pathologically
+      # deep — reject rather than silently passing.
+      {% if idx < queue.size %}
+        {% sanitize_ok = false %}
       {% end %}
       {% unless sanitize_ok %}
-        {% raise "`sanitize` requires String, JSON::Any, or arbitrarily-nested Array/Set/Deque/Hash/Tuple/NamedTuple with String leaves (plus nilable variants), got `#{resolved_type}` for `#{name.var}`" %}
+        {% raise "`sanitize` requires String, JSON::Any, a type including ActiveModel::Sanitizable, arbitrarily-nested Array/Set/Deque/Slice/StaticArray/Hash/Range/Tuple/NamedTuple with sanitizable leaves, or a union containing at least one sanitizable arm (plus nilable variants), got `#{resolved_type}` for `#{name.var}`" %}
       {% end %}
     {% end %}
 
@@ -949,18 +994,18 @@ abstract class ActiveModel::Model
       ignore: {{ !persistence }},
       {{tags.double_splat}}
     )]
-    # NOTE: use `getter` (not `property`) for nilable types so that the setter
-    # defined later in `__create_initializer__` is the only setter on the field.
-    # Crystal's overload resolution silently fails to replace a `property`-defined
-    # setter with one of identical signature for *generic* nilable types
-    # (e.g. `Set(String)?`, `Array(String)?`, `Hash(String, String)?`), although
-    # it does work for non-generic ones like `String?`. Defining the setter only
-    # once via `__create_initializer__` ensures change tracking, sanitization,
-    # and custom setter blocks run uniformly across all types.
+    # NOTE: use `getter` / `getter!` (not `property` / `property!`) so that the
+    # setter defined later in `__create_initializer__` is the only setter on
+    # the field. Crystal's overload resolution silently fails to replace a
+    # `property`-defined setter with one of identical signature for *generic*
+    # types (e.g. `Set(String)?`, `Array(String)?`, `String | Array(String)`),
+    # although it does work for non-generic ones like `String?`. Defining the
+    # setter only once via `__create_initializer__` ensures change tracking,
+    # sanitization, and custom setter blocks run uniformly across all types.
     {% if resolved_type.nilable? %}
       getter {{name.var}} : {{type_signature.id}}
     {% else %}
-      property! {{name.var}} : {{type_signature.id}}
+      getter! {{name.var}} : {{type_signature.id}}
     {% end %}
 
     @[JSON::Field(ignore: true)]
