@@ -359,7 +359,7 @@ abstract class ActiveModel::Model
             %value = {{name.id}}
             # Convert empty strings to nil for field removal
             {% if opts[:klass].nilable? %}
-              if !%value.is_a?(Range) && %value.responds_to?(:empty?) && %value.empty?
+              if %value.responds_to?(:empty?) && %value.empty?
                 self.{{name.id}} = nil
               else
                 self.{{name.id}} = %value
@@ -387,7 +387,7 @@ abstract class ActiveModel::Model
             %value = model.{{name.id}}
             # Convert empty strings to nil for field removal
             {% if opts[:klass].nilable? %}
-              if !%value.is_a?(Range) && %value.responds_to?(:empty?) && %value.empty?
+              if %value.responds_to?(:empty?) && %value.empty?
                 self.{{name.id}} = nil
               else
                 self.{{name.id}} = %value
@@ -578,9 +578,7 @@ abstract class ActiveModel::Model
         # Track if the value is being removed (set to nil or empty string)
         if value.nil?
           @{{name}}_removed = true
-        elsif !value.is_a?(Range) && value.responds_to?(:empty?) && value.empty?
-          # Range#empty? raises on beginless/endless ranges and "empty range"
-          # is not a "removed value" anyway, so skip it.
+        elsif value.responds_to?(:empty?) && value.empty?
           @{{name}}_removed = true
         else
           @{{name}}_removed = false
@@ -663,7 +661,7 @@ abstract class ActiveModel::Model
             %value = model.{{name}}
             # Convert empty strings to nil for field removal
             {% if opts[:klass].nilable? %}
-              if !%value.is_a?(Range) && %value.responds_to?(:empty?) && %value.empty?
+              if %value.responds_to?(:empty?) && %value.empty?
                 self.{{name}} = nil
               else
                 self.{{name}} = %value
@@ -687,7 +685,7 @@ abstract class ActiveModel::Model
             %value = model.{{name}}
             # Convert empty strings to nil for field removal
             {% if opts[:klass].nilable? %}
-              if !%value.is_a?(Range) && %value.responds_to?(:empty?) && %value.empty?
+              if %value.responds_to?(:empty?) && %value.empty?
                 self.{{name}} = nil
               else
                 self.{{name}} = %value
@@ -711,7 +709,7 @@ abstract class ActiveModel::Model
           %value = model.{{name}}
           # Treat empty strings as nil to support field removal (only for nilable fields)
           {% if opts[:klass].nilable? %}
-            if !%value.is_a?(Range) && %value.responds_to?(:empty?) && %value.empty?
+            if %value.responds_to?(:empty?) && %value.empty?
               self.{{name}} = nil
             else
               self.{{name}} = %value
@@ -733,7 +731,7 @@ abstract class ActiveModel::Model
           %value = model.{{name}}
           # Treat empty strings as nil to support field removal (only for nilable fields)
           {% if opts[:klass].nilable? %}
-            if !%value.is_a?(Range) && %value.responds_to?(:empty?) && %value.empty?
+            if %value.responds_to?(:empty?) && %value.empty?
               self.{{name}} = nil
             else
               self.{{name}} = %value
@@ -758,7 +756,7 @@ abstract class ActiveModel::Model
             %value = model.{{name}}
             # Treat empty strings as nil to support field removal (only for nilable fields)
             {% if opts[:klass].nilable? %}
-              if !%value.is_a?(Range) && %value.responds_to?(:empty?) && %value.empty?
+              if %value.responds_to?(:empty?) && %value.empty?
                 self.{{name}} = nil
               else
                 self.{{name}} = %value
@@ -782,7 +780,7 @@ abstract class ActiveModel::Model
           %value = model.{{name}}
           # Treat empty strings as nil to support field removal (only for nilable fields)
           {% if opts[:klass].nilable? %}
-            if !%value.is_a?(Range) && %value.responds_to?(:empty?) && %value.empty?
+            if %value.responds_to?(:empty?) && %value.empty?
               self.{{name}} = nil
             else
               self.{{name}} = %value
@@ -880,13 +878,9 @@ abstract class ActiveModel::Model
       #   - `String` (leaf)
       #   - `JSON::Any` (handled as a single leaf; sanitizer walks `.raw` at runtime)
       #   - Any type including `ActiveModel::Sanitizable` (user opt-in leaf)
-      #   - `Array(T)` / `Set(T)` / `Deque(T)` / `Slice(T)` / `StaticArray(T, N)`
-      #     where T is itself accepted
+      #   - `Array(T)` / `Set(T)` where T is itself accepted
       #   - `Hash(K, V)` where V is itself accepted (K is unconstrained — keys
       #     are identifiers and are not sanitized)
-      #   - `Range(B, E)` where B and E are each itself accepted (Nil bounds OK)
-      #   - `Tuple(T1, T2, ...)` where every Tᵢ is itself accepted
-      #   - `NamedTuple(k1: V1, k2: V2, ...)` where every Vᵢ is itself accepted
       #   - Union types where at least one arm is itself accepted; other arms
       #     are silently passed through at runtime (e.g. `String | Int32`)
       # Types are finite trees, so the walk terminates.
@@ -894,8 +888,7 @@ abstract class ActiveModel::Model
       {% queue = [resolved_type] %}
       {% idx = 0 %}
       # Bound walk depth at 64 — types are finite trees, and realistic
-      # nesting is shallow. NamedTuples with many keys expand the queue
-      # by one entry per key, so the bound is loose for safety.
+      # nesting is shallow.
       {% for _i in (0..64) %}
         {% if idx < queue.size && sanitize_ok %}
           {% t = queue[idx] %}
@@ -911,20 +904,10 @@ abstract class ActiveModel::Model
                 {% any_sanitizable_arm = true %}
               {% elsif arm < ::ActiveModel::Sanitizable %}
                 {% any_sanitizable_arm = true %}
-              {% elsif arm < Array || arm < Set || arm < Deque || arm < Slice || arm < StaticArray %}
+              {% elsif arm < Array || arm < Set %}
                 {% queue << arm.type_vars.first %}
                 {% any_sanitizable_arm = true %}
               {% elsif arm < Hash %}
-                {% queue << arm.type_vars[1] %}
-                {% any_sanitizable_arm = true %}
-              {% elsif arm < Tuple %}
-                {% for tv in arm.type_vars %}{% queue << tv %}{% end %}
-                {% any_sanitizable_arm = true %}
-              {% elsif arm < NamedTuple %}
-                {% for k in arm.keys %}{% queue << arm[k] %}{% end %}
-                {% any_sanitizable_arm = true %}
-              {% elsif arm < Range %}
-                {% queue << arm.type_vars[0] %}
                 {% queue << arm.type_vars[1] %}
                 {% any_sanitizable_arm = true %}
               {% elsif arm.union? %}
@@ -937,27 +920,13 @@ abstract class ActiveModel::Model
             {% unless any_sanitizable_arm %}{% sanitize_ok = false %}{% end %}
           {% elsif t == String %}
             # leaf — ok
-          {% elsif t == Nil %}
-            # passthrough leaf — appears in open-ended Range bounds and as a
-            # union arm; runtime catch-all returns Nil values unchanged.
           {% elsif t.stringify == "JSON::Any" %}
             # leaf — ok
           {% elsif t < ::ActiveModel::Sanitizable %}
             # user opt-in leaf — runtime delegates to value.sanitize(policy)
-          {% elsif t < Array || t < Set || t < Deque || t < Slice || t < StaticArray %}
+          {% elsif t < Array || t < Set %}
             {% queue << t.type_vars.first %}
           {% elsif t < Hash %}
-            {% queue << t.type_vars[1] %}
-          {% elsif t < Tuple %}
-            {% for tv in t.type_vars %}
-              {% queue << tv %}
-            {% end %}
-          {% elsif t < NamedTuple %}
-            {% for k in t.keys %}
-              {% queue << t[k] %}
-            {% end %}
-          {% elsif t < Range %}
-            {% queue << t.type_vars[0] %}
             {% queue << t.type_vars[1] %}
           {% else %}
             {% sanitize_ok = false %}
@@ -970,7 +939,7 @@ abstract class ActiveModel::Model
         {% sanitize_ok = false %}
       {% end %}
       {% unless sanitize_ok %}
-        {% raise "`sanitize` requires String, JSON::Any, a type including ActiveModel::Sanitizable, arbitrarily-nested Array/Set/Deque/Slice/StaticArray/Hash/Range/Tuple/NamedTuple with sanitizable leaves, or a union containing at least one sanitizable arm (plus nilable variants), got `#{resolved_type}` for `#{name.var}`" %}
+        {% raise "`sanitize` requires String, JSON::Any, a type including ActiveModel::Sanitizable, arbitrarily-nested Array/Set/Hash with sanitizable leaves, or a union containing at least one sanitizable arm (plus nilable variants), got `#{resolved_type}` for `#{name.var}`" %}
       {% end %}
     {% end %}
 

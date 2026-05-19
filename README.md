@@ -181,31 +181,12 @@ Supported field types (each may also be wrapped in `?` to make it nilable):
 |------|-----------|
 | `String` | Sanitize the value |
 | `JSON::Any` | Walk the tree; sanitize string leaves only. Non-string scalars (numbers, booleans, nulls) and object keys pass through |
-| `Array(T)` / `Deque(T)` | Sanitize each element; length and order are preserved |
-| `Set(T)` | Sanitize each element; the set may shrink if two values collapse to the same sanitized string |
+| `Array(T)` | Sanitize each element; length and order are preserved |
+| `Set(T)` | Sanitize each element; the set may shrink if two values collapse to the same sanitized string. Use `Array(T)` if order/length matter |
 | `Hash(K, V)` | Sanitize each value; keys are left untouched (`K` can be any type) |
-| `Tuple(T1, T2, …)` / `NamedTuple(k1: V1, …)` | Sanitize each component, preserving positions/keys |
-| `StaticArray(T, N)` / `Slice(T)` | Sanitize each element; size preserved |
-| `Range(B, E)` | Sanitize either bound; `Nil` bounds pass through |
 | `Union` (e.g. `String \| Int32`) | At least one arm must be sanitizable; non-sanitizable arms pass through at runtime |
 
 Element types inside containers can themselves be any sanitizable type, so `Array(Hash(String, Array(String)))` is supported.
-
-Custom types can opt in by including `ActiveModel::Sanitizable` and implementing `sanitize(policy : Symbol) : self`:
-
-```/dev/null/sanitizable.cr#L1-12
-class Address
-  include ActiveModel::Sanitizable
-  property street : String
-
-  def initialize(@street : String); end
-
-  def sanitize(policy : Symbol) : self
-    @street = ActiveModel::Sanitizer.sanitize(@street, policy)
-    self
-  end
-end
-```
 
 ```/dev/null/example.cr#L1-18
 require "active-model"
@@ -228,6 +209,33 @@ article.body # => "<p>Safe</p>"
 
 The `sanitize:` option is only valid for the field types listed above. Attempting to use it on a type with no sanitizable leaves (e.g. `Int32`, `Array(Int32)`, `Hash(String, Int32)`) produces a compile-time error.
 
-`Slice` and `StaticArray` don't have built-in `JSON::Serializable` / `YAML::Serializable` support, so they only work on the constructor / setter paths — not via `from_json` or `from_yaml`.
+##### Custom and rare types
+
+For types not in the built-in list — your own classes, or stdlib types like `Tuple`, `NamedTuple`, `Deque`, `Range` — opt in by defining a wrapper that includes `ActiveModel::Sanitizable` and implements `sanitize(policy : Symbol) : self`. The macro walker accepts any type that includes the module, and the runtime delegates to the type's own `sanitize` method:
+
+```/dev/null/sanitizable.cr#L1-14
+class Address
+  include ActiveModel::Sanitizable
+  property street : String
+  property city : String
+
+  def initialize(@street : String, @city : String); end
+
+  def sanitize(policy : Symbol) : self
+    @street = ActiveModel::Sanitizer.sanitize(@street, policy)
+    @city = ActiveModel::Sanitizer.sanitize(@city, policy)
+    self
+  end
+end
+
+class Order < ActiveModel::Model
+  attribute address : Address, sanitize: :text
+  attribute addresses : Array(Address), sanitize: :text # nesting works
+end
+```
+
+For stdlib generic types (`Tuple`, `Range`, etc.), prefer wrapping in a `Sanitizable` struct rather than reopening the stdlib type — reopening makes every instance globally satisfy `is_a?(Sanitizable)` and demand the abstract method.
+
+`JSON::Any` is also a universal fallback: any unusual JSON-shaped payload can be modelled as `JSON::Any` and sanitized.
 
 

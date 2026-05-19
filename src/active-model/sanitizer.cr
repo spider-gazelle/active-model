@@ -39,9 +39,8 @@ module ActiveModel::Sanitizer
   # Recursive Set(T).
   # NOTE: post-sanitize de-duplication may shrink the set when two distinct
   # input values collapse to the same sanitized value (e.g. `:text` turns
-  # both `"<b>x</b>"` and `"x"` into `"x"`). For nested element types,
-  # equality is element-wise — two arrays that sanitize to identical content
-  # will also merge.
+  # both `"<b>x</b>"` and `"x"` into `"x"`). Use `Array(T)` if order/length
+  # must be preserved.
   def self.sanitize(value : Set(T), policy : Symbol) : Set(T) forall T
     result = Set(T).new(initial_capacity: value.size)
     value.each { |v| result << sanitize(v, policy).as(T) }
@@ -54,52 +53,6 @@ module ActiveModel::Sanitizer
     result = Hash(K, V).new(initial_capacity: value.size)
     value.each { |k, v| result[k] = sanitize(v, policy).as(V) }
     result
-  end
-
-  # Recursive Deque(T). `Deque#map` returns Array, so we manually construct
-  # to preserve the container type.
-  def self.sanitize(value : Deque(T), policy : Symbol) : Deque(T) forall T
-    result = Deque(T).new(value.size)
-    value.each { |v| result << sanitize(v, policy).as(T) }
-    result
-  end
-
-  # Recursive StaticArray(T, N). Stack-allocated, fixed-size; mutate in place.
-  def self.sanitize(value : StaticArray(T, N), policy : Symbol) : StaticArray(T, N) forall T, N
-    value.size.times { |i| value[i] = sanitize(value[i], policy).as(T) }
-    value
-  end
-
-  # Recursive Slice(T). Allocates a fresh slice — `Slice(T)` wraps a
-  # `Pointer(T)` and is aliased with the caller's storage, so mutating
-  # in place would also mutate any external reference to the same buffer.
-  # NOTE: `Slice(UInt8)` (= `Bytes`) is the common Slice shape; UInt8 is not
-  # sanitizable, so the macro-time walker rejects such attributes. This overload
-  # is genuinely useful only for `Slice(String)` or nested sanitizable element
-  # types.
-  def self.sanitize(value : Slice(T), policy : Symbol) : Slice(T) forall T
-    Slice(T).new(value.size) { |i| sanitize(value[i], policy).as(T) }
-  end
-
-  # Recursive Range(B, E). Either bound may be `Nil` for open-ended ranges.
-  def self.sanitize(value : Range(B, E), policy : Symbol) : Range(B, E) forall B, E
-    new_begin = value.begin.nil? ? value.begin : sanitize(value.begin.not_nil!, policy).as(B)
-    new_end = value.end.nil? ? value.end : sanitize(value.end.not_nil!, policy).as(E)
-    Range.new(new_begin, new_end, value.exclusive?)
-  end
-
-  # Recursive Tuple(...). Delegates to the instance method on the struct
-  # so we can use `T[i]` macro reflection per-position — `Tuple#map` would
-  # collapse each element to the union of all positional types.
-  def self.sanitize(value : Tuple, policy : Symbol)
-    value.sanitize(policy)
-  end
-
-  # Recursive NamedTuple(...). Delegates to the instance method on the
-  # struct — `T.keys` / `T[key]` macro reflection is only available where
-  # `T` is the struct's own type parameter.
-  def self.sanitize(value : NamedTuple, policy : Symbol)
-    value.sanitize(policy)
   end
 
   # JSON::Any — walk the tree, sanitize string leaves only.
@@ -140,43 +93,10 @@ module ActiveModel::Sanitizer
       sanitize(value, policy)
     elsif value.is_a?(::ActiveModel::Sanitizable)
       value.sanitize(policy)
-    elsif value.is_a?(Array) || value.is_a?(Set) || value.is_a?(Deque) ||
-          value.is_a?(Hash) || value.is_a?(Tuple) || value.is_a?(NamedTuple) ||
-          value.is_a?(StaticArray) || value.is_a?(Slice) || value.is_a?(Range)
+    elsif value.is_a?(Array) || value.is_a?(Set) || value.is_a?(Hash)
       sanitize(value, policy)
     else
       value
     end
-  end
-end
-
-# Reopened to gain access to `T[i]` macro reflection — `Tuple#map` would
-# collapse each element type into the union of all positional types,
-# which would no longer satisfy the declared attribute type.
-struct Tuple
-  # :nodoc:
-  def sanitize(policy : Symbol) : self
-    {% begin %}
-      {
-        {% for i in 0...T.size %}
-          ::ActiveModel::Sanitizer.sanitize(self[{{i}}], policy).as({{T[i]}}),
-        {% end %}
-      }
-    {% end %}
-  end
-end
-
-# Reopened to gain access to `T.keys` / `T[key]` macro reflection, which is
-# only available where `T` is the struct's own type parameter.
-struct NamedTuple
-  # :nodoc:
-  def sanitize(policy : Symbol) : self
-    {% begin %}
-      NamedTuple.new(
-        {% for key in T.keys %}
-          {{key.id}}: ::ActiveModel::Sanitizer.sanitize(self[{{key.symbolize}}], policy).as({{T[key]}}),
-        {% end %}
-      )
-    {% end %}
   end
 end
