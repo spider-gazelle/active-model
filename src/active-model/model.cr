@@ -900,7 +900,7 @@ abstract class ActiveModel::Model
             {% for arm in t.union_types %}
               {% if arm == String %}
                 {% any_sanitizable_arm = true %}
-              {% elsif arm.stringify == "JSON::Any" %}
+              {% elsif arm == JSON::Any %}
                 {% any_sanitizable_arm = true %}
               {% elsif arm < ::ActiveModel::Sanitizable %}
                 {% any_sanitizable_arm = true %}
@@ -920,7 +920,7 @@ abstract class ActiveModel::Model
             {% unless any_sanitizable_arm %}{% sanitize_ok = false %}{% end %}
           {% elsif t == String %}
             # leaf — ok
-          {% elsif t.stringify == "JSON::Any" %}
+          {% elsif t == JSON::Any %}
             # leaf — ok
           {% elsif t < ::ActiveModel::Sanitizable %}
             # user opt-in leaf — runtime delegates to value.sanitize(policy)

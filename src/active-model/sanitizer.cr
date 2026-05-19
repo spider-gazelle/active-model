@@ -88,11 +88,11 @@ module ActiveModel::Sanitizer
   # narrows `value`'s type inside each `is_a?` branch.
   def self.sanitize(value, policy : Symbol)
     if value.is_a?(String)
-      resolve_policy(policy).process(value)
+      sanitize(value, policy)
     elsif value.is_a?(JSON::Any)
       sanitize(value, policy)
     elsif value.is_a?(::ActiveModel::Sanitizable)
-      value.sanitize(policy)
+      sanitize(value, policy)
     elsif value.is_a?(Array) || value.is_a?(Set) || value.is_a?(Hash)
       sanitize(value, policy)
     else
