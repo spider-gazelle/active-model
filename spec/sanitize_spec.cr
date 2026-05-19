@@ -100,6 +100,54 @@ class SanitizedJsonAnyWithSetter < ActiveModel::Model
   end
 end
 
+class SanitizedHashSymbolKey < ActiveModel::Model
+  attribute fields : Hash(Symbol, String), sanitize: :common
+end
+
+class SanitizedHashIntKey < ActiveModel::Model
+  attribute fields : Hash(Int32, String), sanitize: :text
+end
+
+class SanitizedHashSymbolNested < ActiveModel::Model
+  attribute fields : Hash(Symbol, Array(String)), sanitize: :basic
+end
+
+class SanitizedDequeText < ActiveModel::Model
+  attribute history : Deque(String), sanitize: :text
+end
+
+class SanitizedNilableDequeCommon < ActiveModel::Model
+  attribute history : Deque(String)?, sanitize: :common
+end
+
+class SanitizedArrayOfDeques < ActiveModel::Model
+  attribute groups : Array(Deque(String)), sanitize: :text
+end
+
+class SanitizedTuplePair < ActiveModel::Model
+  attribute pair : Tuple(String, String), sanitize: :text
+end
+
+class SanitizedTupleNested < ActiveModel::Model
+  attribute payload : Tuple(String, Array(String)), sanitize: :common
+end
+
+class SanitizedNilableTuple < ActiveModel::Model
+  attribute pair : Tuple(String, String)?, sanitize: :basic
+end
+
+class SanitizedNamedTupleSimple < ActiveModel::Model
+  attribute fields : NamedTuple(a: String, b: String), sanitize: :common
+end
+
+class SanitizedNamedTupleNested < ActiveModel::Model
+  attribute fields : NamedTuple(title: String, tags: Array(String)), sanitize: :text
+end
+
+class SanitizedNilableNamedTuple < ActiveModel::Model
+  attribute fields : NamedTuple(name: String, body: String)?, sanitize: :inline
+end
+
 describe "Sanitization" do
   describe ":text policy" do
     it "strips all HTML tags on initialization" do
@@ -696,6 +744,139 @@ describe "Sanitization" do
       model = SanitizedJsonAnyWithSetter.new(payload: JSON::Any.new("<b>hi</b>"))
       # Sanitization strips the tag, then the setter wraps it.
       model.payload["wrapped"].as_s.should eq "hi"
+    end
+  end
+
+  describe "Hash with non-String keys" do
+    it "sanitizes Hash(Symbol, String) values" do
+      model = SanitizedHashSymbolKey.new(fields: {:a => "<p>hi</p><script>x</script>", :b => "<p>ok</p>"})
+      model.fields.should eq({:a => "<p>hi</p>", :b => "<p>ok</p>"})
+    end
+
+    it "sanitizes Hash(Int32, String) values" do
+      model = SanitizedHashIntKey.new(fields: {1 => "<b>one</b>", 2 => "<i>two</i>"})
+      model.fields.should eq({1 => "one", 2 => "two"})
+    end
+
+    it "sanitizes nested Hash(Symbol, Array(String))" do
+      model = SanitizedHashSymbolNested.new(fields: {:tags => ["<b>x</b>", "<script>bad</script>y"]})
+      model.fields[:tags].should eq ["<b>x</b>", "y"]
+    end
+
+    it "sanitizes on direct setter assignment" do
+      model = SanitizedHashSymbolKey.new(fields: {:a => "<p>clean</p>"})
+      model.fields = {:a => "<p>x</p><script>y</script>"}
+      model.fields.should eq({:a => "<p>x</p>"})
+    end
+  end
+
+  describe "Deque(String) fields" do
+    it "sanitizes each element on initialization" do
+      model = SanitizedDequeText.new(history: Deque{"<b>a</b>", "<i>b</i>"})
+      model.history.should eq Deque{"a", "b"}
+    end
+
+    it "preserves order and length" do
+      model = SanitizedDequeText.new(history: Deque{"hi", "<script>x</script>there"})
+      model.history.should eq Deque{"hi", "there"}
+    end
+
+    it "sanitizes on direct setter assignment" do
+      model = SanitizedDequeText.new(history: Deque{"clean"})
+      model.history = Deque{"<em>dirty</em>", "ok"}
+      model.history.should eq Deque{"dirty", "ok"}
+    end
+
+    it "handles empty deque without error" do
+      model = SanitizedDequeText.new(history: Deque(String).new)
+      model.history.empty?.should be_true
+    end
+
+    it "sanitizes nilable Deque(String)? on initialization" do
+      model = SanitizedNilableDequeCommon.new(history: Deque{"<p>block</p>", "<script>x</script>"})
+      model.history.should eq Deque{"<p>block</p>", ""}
+    end
+
+    it "handles nilable Deque(String)? with nil value" do
+      model = SanitizedNilableDequeCommon.new
+      model.history.should be_nil
+    end
+
+    it "sanitizes Array(Deque(String))" do
+      model = SanitizedArrayOfDeques.new(groups: [Deque{"<b>x</b>"}, Deque{"<i>y</i>"}])
+      model.groups.should eq [Deque{"x"}, Deque{"y"}]
+    end
+  end
+
+  describe "Tuple fields" do
+    it "sanitizes each positional element" do
+      model = SanitizedTuplePair.new(pair: {"<b>a</b>", "<i>b</i>"})
+      model.pair.should eq({"a", "b"})
+    end
+
+    it "sanitizes nested Tuple(String, Array(String))" do
+      model = SanitizedTupleNested.new(payload: {"<p>t</p><script>x</script>", ["<p>one</p>", "<p>two</p>"]})
+      model.payload.should eq({"<p>t</p>", ["<p>one</p>", "<p>two</p>"]})
+    end
+
+    it "sanitizes on direct setter assignment" do
+      model = SanitizedTuplePair.new(pair: {"clean", "ok"})
+      model.pair = {"<b>x</b>", "<i>y</i>"}
+      model.pair.should eq({"x", "y"})
+    end
+
+    it "handles nilable Tuple with nil" do
+      model = SanitizedNilableTuple.new
+      model.pair.should be_nil
+    end
+
+    it "sanitizes nilable Tuple when present" do
+      model = SanitizedNilableTuple.new(pair: {"<b>x</b>", "<i>y</i>"})
+      model.pair.should eq({"<b>x</b>", "<i>y</i>"})
+    end
+  end
+
+  describe "NamedTuple fields" do
+    it "sanitizes each value, preserves keys" do
+      model = SanitizedNamedTupleSimple.new(fields: {a: "<p>hi</p><script>x</script>", b: "<p>ok</p>"})
+      model.fields.should eq({a: "<p>hi</p>", b: "<p>ok</p>"})
+    end
+
+    it "sanitizes nested NamedTuple values" do
+      model = SanitizedNamedTupleNested.new(fields: {title: "<b>T</b>", tags: ["<i>x</i>", "y"]})
+      model.fields.should eq({title: "T", tags: ["x", "y"]})
+    end
+
+    it "handles nilable NamedTuple with nil" do
+      model = SanitizedNilableNamedTuple.new
+      model.fields.should be_nil
+    end
+
+    it "sanitizes on direct setter assignment" do
+      model = SanitizedNamedTupleSimple.new(fields: {a: "clean", b: "ok"})
+      model.fields = {a: "<p>x</p><script>y</script>", b: "<p>z</p>"}
+      model.fields.should eq({a: "<p>x</p>", b: "<p>z</p>"})
+    end
+
+    it "preserves the original NamedTuple type" do
+      model = SanitizedNamedTupleSimple.new(fields: {a: "<b>hi</b>", b: "ok"})
+      model.fields.is_a?(NamedTuple(a: String, b: String)).should be_true
+    end
+  end
+
+  describe "change tracking with new shapes" do
+    it "does not mark Tuple changed when sanitized value matches" do
+      model = SanitizedTuplePair.new(pair: {"x", "y"})
+      model.clear_changes_information
+      model.pair = {"<b>x</b>", "y"}
+      model.pair_changed?.should be_false
+    end
+
+    it "does not mark NamedTuple changed when sanitized value matches" do
+      model = SanitizedNamedTupleSimple.new(fields: {a: "<p>hi</p>", b: "<p>ok</p>"})
+      model.clear_changes_information
+      model.fields = {a: "<p>hi</p>", b: "<p>ok</p>"}
+      model.fields_changed?.should be_false
     end
   end
 end

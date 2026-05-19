@@ -39,11 +39,34 @@ module ActiveModel::Sanitizer
     result
   end
 
-  # Recursive Hash(String, V). Keys are identifiers and are not sanitized.
-  def self.sanitize(value : Hash(String, V), policy : Symbol) : Hash(String, V) forall V
-    result = Hash(String, V).new(initial_capacity: value.size)
+  # Recursive Hash. Keys are identifiers and are not sanitized,
+  # so K can be any type; only V is walked.
+  def self.sanitize(value : Hash(K, V), policy : Symbol) : Hash(K, V) forall K, V
+    result = Hash(K, V).new(initial_capacity: value.size)
     value.each { |k, v| result[k] = sanitize(v, policy).as(V) }
     result
+  end
+
+  # Recursive Deque(T). `Deque#map` returns Array, so we manually construct
+  # to preserve the container type.
+  def self.sanitize(value : Deque(T), policy : Symbol) : Deque(T) forall T
+    result = Deque(T).new(value.size)
+    value.each { |v| result << sanitize(v, policy).as(T) }
+    result
+  end
+
+  # Recursive Tuple(...). Delegates to the instance method on the struct
+  # so we can use `T[i]` macro reflection per-position — `Tuple#map` would
+  # collapse each element to the union of all positional types.
+  def self.sanitize(value : Tuple, policy : Symbol)
+    value.sanitize(policy)
+  end
+
+  # Recursive NamedTuple(...). Delegates to the instance method on the
+  # struct — `T.keys` / `T[key]` macro reflection is only available where
+  # `T` is the struct's own type parameter.
+  def self.sanitize(value : NamedTuple, policy : Symbol)
+    value.sanitize(policy)
   end
 
   # JSON::Any — walk the tree, sanitize string leaves only.
@@ -62,5 +85,36 @@ module ActiveModel::Sanitizer
     else
       value
     end
+  end
+end
+
+# Reopened to gain access to `T[i]` macro reflection — `Tuple#map` would
+# collapse each element type into the union of all positional types,
+# which would no longer satisfy the declared attribute type.
+struct Tuple
+  # :nodoc:
+  def sanitize(policy : Symbol) : self
+    {% begin %}
+      {
+        {% for i in 0...T.size %}
+          ::ActiveModel::Sanitizer.sanitize(self[{{i}}], policy).as({{T[i]}}),
+        {% end %}
+      }
+    {% end %}
+  end
+end
+
+# Reopened to gain access to `T.keys` / `T[key]` macro reflection, which is
+# only available where `T` is the struct's own type parameter.
+struct NamedTuple
+  # :nodoc:
+  def sanitize(policy : Symbol) : self
+    {% begin %}
+      NamedTuple.new(
+        {% for key in T.keys %}
+          {{key.id}}: ::ActiveModel::Sanitizer.sanitize(self[{{key.symbolize}}], policy).as({{T[key]}}),
+        {% end %}
+      )
+    {% end %}
   end
 end

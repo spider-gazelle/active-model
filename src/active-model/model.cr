@@ -878,8 +878,11 @@ abstract class ActiveModel::Model
       # Walk the type tree iteratively. Accepted shapes:
       #   - `String` (leaf)
       #   - `JSON::Any` (handled as a single leaf; sanitizer walks `.raw` at runtime)
-      #   - `Array(T)` / `Set(T)` where T is itself accepted
-      #   - `Hash(String, V)` where V is itself accepted
+      #   - `Array(T)` / `Set(T)` / `Deque(T)` where T is itself accepted
+      #   - `Hash(K, V)` where V is itself accepted (K is unconstrained — keys
+      #     are identifiers and are not sanitized)
+      #   - `Tuple(T1, T2, ...)` where every Tᵢ is itself accepted
+      #   - `NamedTuple(k1: V1, k2: V2, ...)` where every Vᵢ is itself accepted
       # Types are finite trees, so the walk terminates.
       {% sanitize_ok = true %}
       {% if non_nil.stringify == "JSON::Any" %}
@@ -887,9 +890,10 @@ abstract class ActiveModel::Model
       {% else %}
         {% queue = [non_nil] %}
         {% idx = 0 %}
-        # Bound walk depth at 32 — types are finite trees, and realistic
-        # nesting is shallow. This is far more than any sane attribute.
-        {% for _i in (0..32) %}
+        # Bound walk depth at 64 — types are finite trees, and realistic
+        # nesting is shallow. NamedTuples with many keys expand the queue
+        # by one entry per key, so the bound is loose for safety.
+        {% for _i in (0..64) %}
           {% if idx < queue.size && sanitize_ok %}
             {% t = queue[idx] %}
             {% idx = idx + 1 %}
@@ -897,27 +901,31 @@ abstract class ActiveModel::Model
               # leaf — ok
             {% elsif t.stringify == "JSON::Any" %}
               # nested JSON::Any leaf — ok
-            {% elsif t < Array || t < Set %}
+            {% elsif t < Array || t < Set || t < Deque %}
               {% queue << t.type_vars.first %}
             {% elsif t < Hash %}
-              {% if t.type_vars[0] != String %}
-                {% sanitize_ok = false %}
-              {% else %}
-                {% queue << t.type_vars[1] %}
+              {% queue << t.type_vars[1] %}
+            {% elsif t < Tuple %}
+              {% for tv in t.type_vars %}
+                {% queue << tv %}
+              {% end %}
+            {% elsif t < NamedTuple %}
+              {% for k in t.keys %}
+                {% queue << t[k] %}
               {% end %}
             {% else %}
               {% sanitize_ok = false %}
             {% end %}
           {% end %}
         {% end %}
-        # If we couldn't fully walk the type in 32 iterations, it's pathologically
+        # If we couldn't fully walk the type in 64 iterations, it's pathologically
         # deep — reject rather than silently passing.
         {% if idx < queue.size %}
           {% sanitize_ok = false %}
         {% end %}
       {% end %}
       {% unless sanitize_ok %}
-        {% raise "`sanitize` requires String, JSON::Any, or arbitrarily-nested Array/Set/Hash(String, _) with String leaves (plus nilable variants), got `#{resolved_type}` for `#{name.var}`" %}
+        {% raise "`sanitize` requires String, JSON::Any, or arbitrarily-nested Array/Set/Deque/Hash/Tuple/NamedTuple with String leaves (plus nilable variants), got `#{resolved_type}` for `#{name.var}`" %}
       {% end %}
     {% end %}
 
