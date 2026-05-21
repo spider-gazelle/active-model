@@ -562,10 +562,10 @@ abstract class ActiveModel::Model
         {% if opts[:sanitize] %}
           {% if opts[:klass].nilable? %}
             if %_sanitize_val = value
-              value = ActiveModel::Sanitizer.{{ opts[:sanitize].id }}.process(%_sanitize_val)
+              value = ActiveModel::Sanitizer.sanitize(%_sanitize_val, {{ opts[:sanitize] }})
             end
           {% else %}
-            value = ActiveModel::Sanitizer.{{ opts[:sanitize].id }}.process(value)
+            value = ActiveModel::Sanitizer.sanitize(value, {{ opts[:sanitize] }})
           {% end %}
         {% end %}
 
@@ -865,14 +865,81 @@ abstract class ActiveModel::Model
     {% end %}
 
     # Validate sanitize option
+    # KEEP IN SYNC with overloads in `src/active-model/sanitizer.cr` —
+    # the set of types accepted here must match the `Sanitizer.sanitize`
+    # overloads, otherwise the macro accepts a type that fails to compile
+    # at the setter call site.
     {% if sanitize %}
       {% valid_sanitize = [:basic, :common, :inline, :text] %}
       {% unless valid_sanitize.includes?(sanitize) %}
         {% raise "`sanitize` expected to be one of :basic, :common, :inline, :text — got :#{sanitize.id}" %}
       {% end %}
-      {% non_nil = resolved_type.nilable? ? resolved_type.union_types.reject(&.nilable?).first : resolved_type %}
-      {% unless non_nil == String %}
-        {% raise "`sanitize` option is only valid for String fields, got `#{resolved_type}` for `#{name.var}`" %}
+      # Walk the type tree iteratively. Accepted shapes:
+      #   - `String` (leaf)
+      #   - `JSON::Any` (handled as a single leaf; sanitizer walks `.raw` at runtime)
+      #   - Any type including `ActiveModel::Sanitizable` (user opt-in leaf)
+      #   - `Array(T)` / `Set(T)` where T is itself accepted
+      #   - `Hash(K, V)` where V is itself accepted (K is unconstrained — keys
+      #     are identifiers and are not sanitized)
+      #   - Union types where at least one arm is itself accepted; other arms
+      #     are silently passed through at runtime (e.g. `String | Int32`)
+      # Types are finite trees, so the walk terminates.
+      {% sanitize_ok = true %}
+      {% queue = [resolved_type] %}
+      {% idx = 0 %}
+      # Bound walk depth at 64 — types are finite trees, and realistic
+      # nesting is shallow.
+      {% for _i in (0..64) %}
+        {% if idx < queue.size && sanitize_ok %}
+          {% t = queue[idx] %}
+          {% idx = idx + 1 %}
+          {% if t.union? %}
+            # Union: at least one arm must be a sanitizable shape;
+            # other arms are silently accepted as runtime passthroughs.
+            {% any_sanitizable_arm = false %}
+            {% for arm in t.union_types %}
+              {% if arm == String %}
+                {% any_sanitizable_arm = true %}
+              {% elsif arm == JSON::Any %}
+                {% any_sanitizable_arm = true %}
+              {% elsif arm < ::ActiveModel::Sanitizable %}
+                {% any_sanitizable_arm = true %}
+              {% elsif arm < Array || arm < Set %}
+                {% queue << arm.type_vars.first %}
+                {% any_sanitizable_arm = true %}
+              {% elsif arm < Hash %}
+                {% queue << arm.type_vars[1] %}
+                {% any_sanitizable_arm = true %}
+              {% elsif arm.union? %}
+                {% queue << arm %}
+                {% any_sanitizable_arm = true %}
+              {% else %}
+                # passthrough arm — accepted silently
+              {% end %}
+            {% end %}
+            {% unless any_sanitizable_arm %}{% sanitize_ok = false %}{% end %}
+          {% elsif t == String %}
+            # leaf — ok
+          {% elsif t == JSON::Any %}
+            # leaf — ok
+          {% elsif t < ::ActiveModel::Sanitizable %}
+            # user opt-in leaf — runtime delegates to value.sanitize(policy)
+          {% elsif t < Array || t < Set %}
+            {% queue << t.type_vars.first %}
+          {% elsif t < Hash %}
+            {% queue << t.type_vars[1] %}
+          {% else %}
+            {% sanitize_ok = false %}
+          {% end %}
+        {% end %}
+      {% end %}
+      # If we couldn't fully walk the type in 64 iterations, it's pathologically
+      # deep — reject rather than silently passing.
+      {% if idx < queue.size %}
+        {% sanitize_ok = false %}
+      {% end %}
+      {% unless sanitize_ok %}
+        {% raise "`sanitize` requires String, JSON::Any, a type including ActiveModel::Sanitizable, arbitrarily-nested Array/Set/Hash with sanitizable leaves, or a union containing at least one sanitizable arm (plus nilable variants), got `#{resolved_type}` for `#{name.var}`" %}
       {% end %}
     {% end %}
 
@@ -896,10 +963,18 @@ abstract class ActiveModel::Model
       ignore: {{ !persistence }},
       {{tags.double_splat}}
     )]
+    # NOTE: use `getter` / `getter!` (not `property` / `property!`) so that the
+    # setter defined later in `__create_initializer__` is the only setter on
+    # the field. Crystal's overload resolution silently fails to replace a
+    # `property`-defined setter with one of identical signature for *generic*
+    # types (e.g. `Set(String)?`, `Array(String)?`, `String | Array(String)`),
+    # although it does work for non-generic ones like `String?`. Defining the
+    # setter only once via `__create_initializer__` ensures change tracking,
+    # sanitization, and custom setter blocks run uniformly across all types.
     {% if resolved_type.nilable? %}
-      property {{name.var}} : {{type_signature.id}}
+      getter {{name.var}} : {{type_signature.id}}
     {% else %}
-      property! {{name.var}} : {{type_signature.id}}
+      getter! {{name.var}} : {{type_signature.id}}
     {% end %}
 
     @[JSON::Field(ignore: true)]

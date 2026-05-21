@@ -163,7 +163,7 @@ m.to_method_json # {"joined":0,"foo":"foo"}
 
 #### Sanitization
 
-Use the `sanitize:` option on `attribute` to automatically strip or clean HTML content from string fields.
+Use the `sanitize:` option on `attribute` to automatically strip or clean HTML content from string fields and from arbitrarily-nested containers of strings.
 Sanitization is applied on every write path — constructors, setters, JSON/YAML deserialization, and HTTP params.
 
 Supported policies:
@@ -175,21 +175,67 @@ Supported policies:
 | `:inline` | Allows inline elements, strips block-level elements |
 | `:common` | Allows common safe HTML (`<p>`, `<b>`, `<i>`, etc.) |
 
-```/dev/null/example.cr#L1-12
+Supported field types (each may also be wrapped in `?` to make it nilable):
+
+| Type | Behaviour |
+|------|-----------|
+| `String` | Sanitize the value |
+| `JSON::Any` | Walk the tree; sanitize string leaves only. Non-string scalars (numbers, booleans, nulls) and object keys pass through |
+| `Array(T)` | Sanitize each element; length and order are preserved |
+| `Set(T)` | Sanitize each element; the set may shrink if two values collapse to the same sanitized string. Use `Array(T)` if order/length matter |
+| `Hash(K, V)` | Sanitize each value; keys are left untouched (`K` can be any type) |
+| `Union` (e.g. `String \| Int32`) | At least one arm must be sanitizable; non-sanitizable arms pass through at runtime |
+
+Element types inside containers can themselves be any sanitizable type, so `Array(Hash(String, Array(String)))` is supported.
+
+```/dev/null/example.cr#L1-18
 require "active-model"
 
 class Article < ActiveModel::Model
   attribute title : String, sanitize: :text
   attribute body : String?, sanitize: :common
+  attribute tags : Array(String), sanitize: :text
+  attribute keywords : Set(String), sanitize: :text
+  attribute metadata : Hash(String, String), sanitize: :common
 end
 
-article = Article.new(title: "<b>Hello</b> World")
+article = Article.new(title: "<b>Hello</b> World", tags: ["<b>one</b>", "<i>two</i>"])
 article.title # => "Hello World"
+article.tags  # => ["one", "two"]
 
 article.body = "<p>Safe</p><script>alert('xss')</script>"
 article.body # => "<p>Safe</p>"
 ```
 
-The `sanitize:` option is only valid for `String` (or `String?`) fields. Attempting to use it on other types will produce a compile-time error.
+The `sanitize:` option is only valid for the field types listed above. Attempting to use it on a type with no sanitizable leaves (e.g. `Int32`, `Array(Int32)`, `Hash(String, Int32)`) produces a compile-time error.
+
+##### Custom and rare types
+
+For types not in the built-in list — your own classes, or stdlib types like `Tuple`, `NamedTuple`, `Deque`, `Range` — opt in by defining a wrapper that includes `ActiveModel::Sanitizable` and implements `sanitize(policy : Symbol) : self`. The macro walker accepts any type that includes the module, and the runtime delegates to the type's own `sanitize` method:
+
+```/dev/null/sanitizable.cr#L1-14
+class Address
+  include ActiveModel::Sanitizable
+  property street : String
+  property city : String
+
+  def initialize(@street : String, @city : String); end
+
+  def sanitize(policy : Symbol) : self
+    @street = ActiveModel::Sanitizer.sanitize(@street, policy)
+    @city = ActiveModel::Sanitizer.sanitize(@city, policy)
+    self
+  end
+end
+
+class Order < ActiveModel::Model
+  attribute address : Address, sanitize: :text
+  attribute addresses : Array(Address), sanitize: :text # nesting works
+end
+```
+
+For stdlib generic types (`Tuple`, `Range`, etc.), prefer wrapping in a `Sanitizable` struct rather than reopening the stdlib type — reopening makes every instance globally satisfy `is_a?(Sanitizable)` and demand the abstract method.
+
+`JSON::Any` is also a universal fallback: any unusual JSON-shaped payload can be modelled as `JSON::Any` and sanitized.
 
 
