@@ -61,7 +61,56 @@ class SuperHero < Hero
   end
 end
 
+# `run_*_callbacks` is defined once on the including type and reaches a concrete
+# model through `before_*`/`after_*`, so these exercise the virtual-receiver
+# path: the callbacks that run must be the ones belonging to the runtime type.
+class TracedHero < BaseOrm
+  attribute name : String
+
+  property history = [] of String
+
+  before_save { history << "before:TracedHero" }
+  after_save { history << "after:TracedHero" }
+
+  def save
+    run_save_callbacks { history << "save" }
+  end
+end
+
+class TracedSideKick < TracedHero
+  before_save { history << "before:TracedSideKick" }
+  after_save { history << "after:TracedSideKick" }
+end
+
 describe ActiveModel::Callbacks do
+  describe "dispatched through a base-typed receiver" do
+    it "runs the runtime type's callbacks, not the static type's" do
+      heroes = [TracedHero.new(name: "base"), TracedSideKick.new(name: "sub")] of TracedHero
+      heroes.each(&.save)
+
+      heroes[0].history.should eq [
+        "before:TracedHero",
+        "save",
+        "after:TracedHero",
+      ]
+      heroes[1].history.should eq [
+        "before:TracedSideKick",
+        "before:TracedHero",
+        "save",
+        "after:TracedSideKick",
+        "after:TracedHero",
+      ]
+    end
+
+    it "propagates exceptions raised by a subclass callback" do
+      hero = [SuperHero.new(name: "footbath", super_power: "none")] of Hero
+
+      expect_raises(Exception, "nope nope nope") do
+        hero.each(&.create)
+      end
+    end
+  end
+
   describe "#save (new record)" do
     it "runs before_save, after_save" do
       callback = CallbackModel.new(name: "foo")
