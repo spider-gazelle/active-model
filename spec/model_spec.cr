@@ -512,6 +512,59 @@ describe ActiveModel::Model do
       changes.keys.size.should eq 1
       changes["time"].should eq new_time.to_unix
     end
+
+    it "should return previous and current values of changes" do
+      old_time = Time.unix(50000)
+      model = AttributeOptions.new(bob: "lob law", time: old_time)
+      model.clear_changes_information
+      model.changes.should be_empty
+
+      new_time = Time.unix(100000)
+      model.time = new_time
+      model.weird = 34
+
+      model.changes.should eq({:time => {old_time, new_time}, :weird => {nil, 34}})
+    end
+
+    it "should serialise previous and current values of changes to json" do
+      old_time = Time.unix(50000)
+      model = AttributeOptions.new(bob: "lob law", time: old_time)
+      model.clear_changes_information
+      model.changes_json.should eq "{}"
+
+      new_time = Time.unix(100000)
+      model.time = new_time
+      model.bob = "Angus"
+      model.feeling = "happy"
+
+      changes = JSON.parse(model.changes_json).as_h
+      changes.keys.should eq ["time", "bob"]
+      changes["time"].should eq [old_time.to_unix, new_time.to_unix]
+      changes["bob"].should eq ["lob law", "Angus"]
+    end
+
+    it "should serialise changes to json from nil" do
+      model = AttributeOptions.new
+      model.clear_changes_information
+      model.time = Time.unix(100000)
+
+      JSON.parse(model.changes_json)["time"].should eq [nil, 100000]
+    end
+
+    it "should serialise enum changes to json" do
+      model = EnumAttributes.new(size: EnumAttributes::Size::Small)
+      model.clear_changes_information
+      model.size = EnumAttributes::Size::Large
+      model.product = EnumAttributes::Product::Burger
+
+      model.changes.should eq({
+        :size    => {EnumAttributes::Size::Small, EnumAttributes::Size::Large},
+        :product => {EnumAttributes::Product::Fries, EnumAttributes::Product::Burger},
+      })
+      changes = JSON.parse(model.changes_json)
+      changes["size"].should eq [0, 2]
+      changes["product"].should eq ["fries", "burger"]
+    end
   end
 
   describe "attribute options" do

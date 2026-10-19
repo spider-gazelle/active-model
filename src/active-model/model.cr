@@ -479,6 +479,61 @@ abstract class ActiveModel::Model
       all.to_json(io)
     end
 
+    # Returns a `Hash` of changed attributes, mapping each to a `{previous, current}` tuple.
+    def changes
+      all = {
+        {% for name in FIELDS.keys %}
+          :{{ name }} => {@{{ name }}_was, @{{ name }}},
+        {% end %}
+      } {% if !HAS_KEYS[0] %} of Nil => Nil {% end %}
+      {% for name in FIELDS.keys %}
+        all.delete(:{{ name }}) unless @{{ name }}_changed
+      {% end %}
+      all
+    end
+
+    # Serialize changed attributes to JSON as `{"attribute": [previous, current]}`.
+    #
+    # Values are serialized as in `to_json`, applying any attribute converters.
+    def changes_json : String
+      String.build do |string|
+        changes_json string
+      end
+    end
+
+    # :ditto:
+    def changes_json(io : IO) : Nil
+      JSON.build(io) { |json| changes_json(json) }
+    end
+
+    # :ditto:
+    def changes_json(json : ::JSON::Builder) : Nil
+      json.object do
+        {% for name, opts in FIELDS %}
+          {% if opts[:show] || opts[:should_persist] %}
+            if @{{ name }}_changed
+              json.field({{ (opts[:tags] && opts[:tags][:json_key]) || name.stringify }}) do
+                json.array do
+                  {% for ivar in ["#{name}_was", name.stringify] %}
+                    %value{ivar} = @{{ ivar.id }}
+                    {% if opts[:converter] %}
+                      if %value{ivar}.nil?
+                        nil.to_json(json)
+                      else
+                        {{ opts[:converter] }}.to_json(%value{ivar}, json)
+                      end
+                    {% else %}
+                      %value{ivar}.to_json(json)
+                    {% end %}
+                  {% end %}
+                end
+              end
+            end
+          {% end %}
+        {% end %}
+      end
+    end
+
     # Serialize the set of changed attributes to YAML.
     def changed_yaml : String
       String.build do |string|
