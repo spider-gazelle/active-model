@@ -453,6 +453,20 @@ abstract class ActiveModel::Model
   end
 
   # :nodoc:
+  macro __attribute_to_json__(json, value, converter)
+    %value = {{ value }}
+    {% if converter %}
+      if %value.nil?
+        nil.to_json({{ json }})
+      else
+        {{ converter }}.to_json(%value, {{ json }})
+      end
+    {% else %}
+      %value.to_json({{ json }})
+    {% end %}
+  end
+
+  # :nodoc:
   macro __track_changes__
     # Returns a `Hash` with all changed attributes.
     def changed_attributes
@@ -514,20 +528,38 @@ abstract class ActiveModel::Model
             if @{{ name }}_changed
               json.field({{ (opts[:tags] && opts[:tags][:json_key]) || name.stringify }}) do
                 json.array do
-                  {% for ivar in ["#{name}_was", name.stringify] %}
-                    %value{ivar} = @{{ ivar.id }}
-                    {% if opts[:converter] %}
-                      if %value{ivar}.nil?
-                        nil.to_json(json)
-                      else
-                        {{ opts[:converter] }}.to_json(%value{ivar}, json)
-                      end
-                    {% else %}
-                      %value{ivar}.to_json(json)
-                    {% end %}
-                  {% end %}
+                  __attribute_to_json__(json, @{{ name }}_was, {{ opts[:converter] }})
+                  __attribute_to_json__(json, @{{ name }}, {{ opts[:converter] }})
                 end
               end
+            end
+          {% end %}
+        {% end %}
+      end
+    end
+
+    # Serialize attributes to JSON, without any other properties `to_json` may
+    # include, as `from_json` expects them.
+    #
+    # Values are serialized as in `to_json`, applying any attribute converters.
+    def attributes_json : String
+      String.build do |string|
+        attributes_json string
+      end
+    end
+
+    # :ditto:
+    def attributes_json(io : IO) : Nil
+      JSON.build(io) { |json| attributes_json(json) }
+    end
+
+    # :ditto:
+    def attributes_json(json : ::JSON::Builder) : Nil
+      json.object do
+        {% for name, opts in FIELDS %}
+          {% if opts[:show] || opts[:should_persist] %}
+            json.field({{ (opts[:tags] && opts[:tags][:json_key]) || name.stringify }}) do
+              __attribute_to_json__(json, @{{ name }}, {{ opts[:converter] }})
             end
           {% end %}
         {% end %}

@@ -97,6 +97,7 @@ person.name_change # => {nil, "JD"}
 person.name_was # => nil
 person.changes # => {:name => {nil, "JD"}}
 person.changes_json # => %({"name":[null,"JD"]})
+person.attributes_json # => %({"name":"JD"}), attributes only
 
 person.clear_changes_information
 person.changed? # => false

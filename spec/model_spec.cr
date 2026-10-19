@@ -22,6 +22,15 @@ class AttributeOptions < ActiveModel::Model
   attribute weird : String | Int32
 end
 
+class ExtraProperties < ActiveModel::Model
+  attribute time : Time, converter: Time::EpochConverter
+  attribute name : String = "bob", mass_assignment: false
+  attribute feeling : String, persistence: false
+
+  @[JSON::Field(ignore_deserialize: true)]
+  property extra : String = "not an attribute"
+end
+
 class SetterBlock < BaseKlass
   attribute that_is : String = "cool"
   attribute tricky : String do |t|
@@ -549,6 +558,19 @@ describe ActiveModel::Model do
       model.time = Time.unix(100000)
 
       JSON.parse(model.changes_json)["time"].should eq [nil, 100000]
+    end
+
+    it "should serialise only attributes to json" do
+      model = ExtraProperties.new(time: Time.unix(100000), feeling: "happy")
+      JSON.parse(model.to_json)["extra"].should eq "not an attribute"
+
+      json = model.attributes_json
+      JSON.parse(json).as_h.should eq({"time" => JSON::Any.new(100000_i64), "name" => JSON::Any.new("bob")})
+
+      model.name = "lob law"
+      copy = ExtraProperties.from_trusted_json(model.attributes_json)
+      copy.time.should eq Time.unix(100000)
+      copy.name.should eq "lob law"
     end
 
     it "should serialise enum changes to json" do
