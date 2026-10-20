@@ -33,7 +33,7 @@ p.attributes # => {:name => "Bob Jane", :age => 32}
 The `attribute` macro takes two parameters. The field name with type and an optional default value.
 
 You can also define enum attributes!<br>
-The default serialisation for enums is to a downcased string. Use [`Enum::ValueConverter(T)`](https://crystal-lang.org/api/latest/Enum/ValueConverter.html) if you want to serialise to the value backing members of the enum.
+The default serialisation for enums is to a snake_case string (`ExtraMedium` is `"extra_medium"`). Use [`Enum::ValueConverter(T)`](https://crystal-lang.org/api/latest/Enum/ValueConverter.html) if you want to serialise to the value backing members of the enum.
 
 ```crystal
 require "active-model"
@@ -72,16 +72,36 @@ class Person < ActiveModel::Model
 end
 ```
 
-The `validate` macro takes three parameters. The symbol of the field and the message that will display when the validation fails. The third is a `Proc` that is provided an instance of `self` and returns either true or false.
+The `validate` macro takes three parameters. The symbol of the field and the message that will display when the validation fails. The third is a `Proc` that is provided an instance of `self` and returns either true or false. Validations can be made conditional with `if:` and `unless:`, a method name or a `Proc`.
+
+```crystal
+validate :name, "is reserved", ->(this : Person) { this.name != "root" }, unless: :admin?
+validates :code, length: {in: 2..4}, if: ->(this : Person) { this.age > 18 }
+```
 
 To check to see if your instance is valid, call `valid?`. Each Proc will be called and if any of them fails, an `errors` Array with the messages is returned.
 
 If no Symbol is provided as a first parameter, the errors will be added to the `:base` field.
 
 ```crystal
-person = Person.new(name: "JD")
+person = Person.new(name: "JD", age: 10)
 person.valid?.should eq false
-person.errors[0].to_s.should eq "Name is too short"
+person.errors[0].to_s.should eq "name is too short"
+```
+
+#### HTTP params
+
+Models can be initialised, or updated with `assign_attributes`, from `HTTP::Params`, a `Hash(String, String)` or a `{key, value}` tuple. Values are parsed into the attribute's type: scalars, enums (by name or value), and arrays or sets of them. Repeat the key, or use `key[]`, for each element. An empty value sets a nilable attribute to `nil`. Attributes that can't be expressed as form values, such as hashes, `JSON::Any` and other models, are ignored.
+
+```crystal
+class Search < ActiveModel::Model
+  attribute ids : Array(Int64) = [] of Int64
+  attribute size : Order::Size?
+end
+
+search = Search.new(HTTP::Params.parse("ids=1&ids=2&size=extra_medium"))
+search.ids  # => [1, 2]
+search.size # => Order::Size::ExtraMedium
 ```
 
 #### Dirty Checking

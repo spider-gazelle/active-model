@@ -402,16 +402,89 @@ abstract class ActiveModel::Model
   end
 
   # :nodoc:
+  # Assigns the fields that can be expressed as form values: scalars, enums, and
+  # arrays or sets of them. Other types, such as hashes and models, are ignored
   macro __from_object_params__(params)
     {% for name, opts in FIELDS %}
       {% if opts[:mass_assign] %}
-        value = {{ params.id }}[{{name.stringify}}]?
+        {% klass = opts[:klass].resolve %}
+        {% types = klass.union_types.reject(&.==(Nil)) %}
+        {% type = types.size == 1 ? types.first : nil %}
+        {% collection = type && (type < Array || type < Set) && type.type_vars.size == 1 ? type : nil %}
+        {% element = collection ? collection.type_vars.first.resolve : nil %}
+        {% element_types = element ? element.union_types.reject(&.==(Nil)) : [] of Nil %}
+        {% element = element_types.size == 1 ? element_types.first : nil %}
+        {% enum_type = type && type < Enum ? type : nil %}
+        {% scalar = type && !collection && !enum_type && type.class.has_method?(:from_http_param) %}
+        {% union = !type && types.all? { |t| t.class.has_method?(:from_http_param) && !(t < Array) } %}
 
-        if value
-          self.{{name}} = {{ opts[:klass] }}.from_http_param(value)
-        end
+        {% if collection && element && (element < Enum || element.class.has_method?(:from_http_param)) && !(element < Array) %}
+          %values = __http_param_values__({{ params.id }}, {{name.stringify}})
+          unless %values.empty?
+            self.{{name}} = {{ collection }}.new.tap do |%collection|
+              %values.each do |%value|
+                next if %value.empty?
+                {% if element < Enum %}
+                  %collection << __parse_http_param_enum__({{ element }}, %value)
+                {% else %}
+                  %collection << {{ element }}.from_http_param(%value)
+                {% end %}
+              end
+            end
+          end
+        {% elsif enum_type || scalar || union %}
+          if %value = __http_param_value__({{ params.id }}, {{name.stringify}})
+            {% if klass.nilable? %}
+              if %value.empty?
+                self.{{name}} = nil
+              else
+            {% end %}
+            {% if enum_type %}
+              self.{{name}} = __parse_http_param_enum__({{ enum_type }}, %value)
+            {% elsif scalar %}
+              self.{{name}} = {{ type }}.from_http_param(%value)
+            {% else %}
+              self.{{name}} = ({{ klass }}).from_http_param(%value)
+            {% end %}
+            {% if klass.nilable? %}
+              end
+            {% end %}
+          end
+        {% end %}
       {% end %}
     {% end %}
+  end
+
+  # :nodoc:
+  def __http_param_value__(params : HTTP::Params | Hash(String, String), name : String) : String?
+    params[name]?
+  end
+
+  # :nodoc:
+  def __http_param_value__(params : Tuple(String, String), name : String) : String?
+    params[1] if params[0] == name
+  end
+
+  # :nodoc:
+  # every value of a param, including `name[]`, as `HTTP::Params` can repeat keys
+  def __http_param_values__(params : HTTP::Params, name : String) : Array(String)
+    params.fetch_all(name) + params.fetch_all("#{name}[]")
+  end
+
+  # :nodoc:
+  def __http_param_values__(params : Hash(String, String), name : String) : Array(String)
+    (params[name]? || params["#{name}[]"]?).try { |value| [value] } || [] of String
+  end
+
+  # :nodoc:
+  def __http_param_values__(params : Tuple(String, String), name : String) : Array(String)
+    params[0].in?(name, "#{name}[]") ? [params[1]] : [] of String
+  end
+
+  # :nodoc:
+  # an enum from its name (case insensitive) or value
+  def __parse_http_param_enum__(type : T.class, value : String) : T forall T
+    type.parse?(value) || value.to_i64?.try { |number| type.from_value?(number) } || raise TypeCastError.new("Failed to cast #{value} to #{type}")
   end
 
   # For overriding in parent classes

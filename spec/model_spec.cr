@@ -92,6 +92,24 @@ class EnumAttributes < ActiveModel::Model
   attribute product : Product = Product::Fries
 end
 
+class ParamTypes < ActiveModel::Model
+  enum Colour
+    Red
+    Green
+  end
+
+  attribute ids : Array(Int32) = [] of Int32
+  attribute names : Set(String)?
+  attribute colours : Array(Colour)?
+  attribute colour : Colour = Colour::Red
+  attribute maybe_colour : Colour?
+  attribute count : Int64?
+  attribute ratio : Float64 | Int32 | Nil
+  attribute labels : Hash(String, String) = {} of String => String
+  attribute data : JSON::Any?
+  attribute tag : Tag?
+end
+
 class Changes < BaseKlass
   attribute arr : Array(Int32) = [1, 2, 3]
 end
@@ -394,6 +412,35 @@ describe ActiveModel::Model do
         :integer    => 45,
         :no_default => "jane",
       })
+    end
+
+    it "uses HTTP Params for collection, enum and union attributes" do
+      params = HTTP::Params.parse("ids=1&ids=2&names[]=a&names[]=b&names[]=a&colours=green&colours=0&colour=GREEN&maybe_colour=1&count=7&ratio=1.5&labels=x&data=1&tag=y")
+      model = ParamTypes.new(params)
+      model.ids.should eq [1, 2]
+      model.names.should eq Set{"a", "b"}
+      model.colours.should eq [ParamTypes::Colour::Green, ParamTypes::Colour::Red]
+      model.colour.should eq ParamTypes::Colour::Green
+      model.maybe_colour.should eq ParamTypes::Colour::Green
+      model.count.should eq 7
+      model.ratio.should eq 1.5
+
+      # types that can't be expressed as form values are ignored
+      model.labels.should be_empty
+      model.data.should be_nil
+      model.tag.should be_nil
+
+      # hashes provide a single value
+      model = ParamTypes.new({"ids" => "3", "maybe_colour" => "", "count" => "", "ratio" => "2"})
+      model.ids.should eq [3]
+      model.maybe_colour.should be_nil
+      model.count.should be_nil
+      model.ratio.should eq 2
+
+      model.assign_attributes({"ids", "4"})
+      model.ids.should eq [4]
+
+      expect_raises(TypeCastError) { ParamTypes.new({"colour" => "blue"}) }
     end
 
     it "respects mass assignment preference option" do

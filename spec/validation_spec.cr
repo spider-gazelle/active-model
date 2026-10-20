@@ -60,6 +60,20 @@ class CustomError < ORM
   }
 end
 
+class Account < ORM
+  attribute code : String?
+  attribute pin : String?
+  attribute locked : Bool = false
+  attribute vip : Bool = false
+
+  validates :code, length: {in: 2..4}
+  validates :pin, length: {within: 4..6, wrong_length: "must be 4 to 6 digits"}
+
+  # the field form, with if: and unless: as keywords
+  validate :code, "is reserved", ->(this : Account) { this.code != "root" }, if: :locked
+  validate :pin, "is too simple", ->(this : Account) { this.pin != "0000" }, unless: ->(this : Account) { this.vip }
+end
+
 describe ActiveModel::Validation do
   describe "nilability" do
     it "validates all non-nillable fields have values" do
@@ -196,6 +210,36 @@ describe ActiveModel::Validation do
       person = Person.new(name: "JD")
       person.valid?.should eq false
       person.errors[0].to_s.should eq "name must be 3 characters long"
+    end
+  end
+
+  describe "validate length in a range" do
+    it "accepts lengths in the range" do
+      Account.new(code: "ab", pin: "123456").valid?.should be_true
+      Account.new(code: "abcd").valid?.should be_true
+      Account.new.valid?.should be_true
+    end
+
+    it "rejects lengths outside the range" do
+      account = Account.new(code: "a", pin: "1234567")
+      account.valid?.should be_false
+      account.errors.map(&.to_s).should eq ["code is the wrong length", "pin must be 4 to 6 digits"]
+    end
+  end
+
+  describe "field validations with if: and unless:" do
+    it "applies if: as a keyword" do
+      Account.new(code: "root").valid?.should be_true
+      account = Account.new(code: "root", locked: true)
+      account.valid?.should be_false
+      account.errors.map(&.to_s).should eq ["code is reserved"]
+    end
+
+    it "applies unless: as a keyword" do
+      Account.new(pin: "0000", vip: true).valid?.should be_true
+      account = Account.new(pin: "0000")
+      account.valid?.should be_false
+      account.errors.map(&.to_s).should eq ["pin is too simple"]
     end
   end
 

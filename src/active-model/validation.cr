@@ -28,9 +28,9 @@ module ActiveModel::Validation
 
     {% if pos %}
       {% if pos.stringify.starts_with? ":" %}
-        %pos_proc = ->(this : {{AM_PARENT_TYPE[:type]}}) { !!this.as({{@type.name}}).{{positive.id}} }
+        %pos_proc = ->(this : {{AM_PARENT_TYPE[:type]}}) { !!this.as({{@type.name}}).{{pos.id}} }
       {% else %}
-        %pos_proc = ->(this : {{AM_PARENT_TYPE[:type]}}) { !!{{positive}}.call(this.as({{@type.name}})) }
+        %pos_proc = ->(this : {{AM_PARENT_TYPE[:type]}}) { !!{{pos}}.call(this.as({{@type.name}})) }
       {% end %}
     {% else %}
       %pos_proc = nil
@@ -38,9 +38,9 @@ module ActiveModel::Validation
 
     {% if neg %}
       {% if neg.stringify.starts_with? ":" %}
-        %neg_proc = ->(this : {{AM_PARENT_TYPE[:type]}}) { !!this.as({{@type.name}}).{{negative.id}} }
+        %neg_proc = ->(this : {{AM_PARENT_TYPE[:type]}}) { !!this.as({{@type.name}}).{{neg.id}} }
       {% else %}
-        %neg_proc = ->(this : {{AM_PARENT_TYPE[:type]}}) { !!{{negative}}.call(this.as({{@type.name}})) }
+        %neg_proc = ->(this : {{AM_PARENT_TYPE[:type]}}) { !!{{neg}}.call(this.as({{@type.name}})) }
       {% end %}
     {% else %}
       %neg_proc = nil
@@ -227,7 +227,7 @@ module ActiveModel::Validation
             data = this.{{field.id}}
             return true if data.nil?
             return true if {{allow_blank}} && data.empty?
-            {{length[:in] || length[:within]}}.includes?(data)
+            ({{length[:in] || length[:within]}}).includes?(data.size)
           }, {{options[:if]}}, {{options[:unless]}}
         {% end %}
 
