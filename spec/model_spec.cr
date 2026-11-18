@@ -52,6 +52,19 @@ class SerializationGroups < BaseKlass
   getter foo = "foo"
 end
 
+class TimestampGroup < ActiveModel::Model
+  attribute timestamp : Time?, converter: Time::EpochConverter, type: "integer", format: "Int64"
+
+  define_to_json :details
+end
+
+private def timestamp_schema_hints(type : T.class) forall T
+  {% begin %}
+    {% field = T.instance_vars.find { |ivar| ivar.name == "timestamp" }.annotation(JSON::Field) %}
+    { {{field[:type]}}, {{field[:format]}} }
+  {% end %}
+end
+
 class Tag < Abstract
   attribute json_tag : String?, tags: {json_emit_null: true}
   attribute yaml_tag : String, tags: {yaml_key: "first_key"}
@@ -484,6 +497,21 @@ describe ActiveModel::Model do
 
       it "includes methods via `methods`" do
         m.to_with_method_json.should eq ({joined: m.joined, foo: m.foo}).to_json
+      end
+
+      it "preserves schema hints on the generated response fields" do
+        timestamp_schema_hints(TimestampGroup).should eq({"integer", "Int64"})
+        timestamp_schema_hints(TimestampGroup::DetailsResponse).should eq({"integer", "Int64"})
+      end
+
+      it "serializes the generated response using the attribute converter" do
+        timestamp = 1_459_859_781_i64
+        model = TimestampGroup.new(timestamp: Time.unix(timestamp))
+        response = model.to_details_struct
+
+        response.to_json.should eq({timestamp: timestamp}.to_json)
+        TimestampGroup::DetailsResponse.from_json(response.to_json).timestamp.should eq(Time.unix(timestamp))
+        TimestampGroup.new.to_details_struct.to_json.should eq("{}")
       end
     end
   end
