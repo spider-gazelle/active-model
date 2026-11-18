@@ -151,8 +151,13 @@ abstract class ActiveModel::Model
         {% for kv in in_group %}
           {% name = kv[0] %}
           {% opts = kv[1] %}
+          {% tags = opts[:tags] %}
 
-          @[JSON::Field( {{opts.double_splat}} )]
+          @[JSON::Field(
+            {{opts.double_splat}},
+            {% if tags && tags[:type] %}type: {{tags[:type]}},{% end %}
+            {% if tags && tags[:format] %}format: {{tags[:format]}},{% end %}
+          )]
           @[YAML::Field( {{opts.double_splat}} )]
           getter {{name}} : {{opts[:type_signature]}}
         {% end %}
